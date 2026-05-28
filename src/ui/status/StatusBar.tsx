@@ -47,13 +47,13 @@ export function StatusBar({ cwd, modelId, usage }: StatusBarProps) {
     const pct = maxTokens > 0 ? (total / maxTokens) * 100 : 0;
     const pctFormatted = pct < 0.1 ? '<0.1' : pct.toFixed(1);
 
-    const usageColor = pct > 80 ? theme.warning : pct > 50 ? theme.textDim : theme.text;
+    const usageColor = pct > 80 ? theme.error : pct > 50 ? theme.warning : theme.accent;
 
     return (
         <Box paddingX={1} paddingY={0}>
-            <Text color={theme.textDim}>{displayPath}</Text>
+            <Text color={theme.accent}>{displayPath}</Text>
             {branch !== 'default' ? (
-                <Text bold color={theme.accent}>
+                <Text bold color={theme.success}>
                     {' '}
                     {branch}
                 </Text>
@@ -64,9 +64,9 @@ export function StatusBar({ cwd, modelId, usage }: StatusBarProps) {
             {usage ? (
                 <>
                     <Text color={theme.textDim}>in:</Text>
-                    <Text color={theme.text}> {fmt(usage.inputTokens)} </Text>
+                    <Text color={theme.accent}> {fmt(usage.inputTokens)} </Text>
                     <Text color={theme.textDim}>out:</Text>
-                    <Text color={theme.text}> {fmt(usage.outputTokens)} </Text>
+                    <Text color={theme.success}> {fmt(usage.outputTokens)} </Text>
                     <Text color={theme.border}>| </Text>
                     <Text color={usageColor}>{fmt(total)}</Text>
                     <Text color={theme.textDim}> ({pctFormatted}%)</Text>

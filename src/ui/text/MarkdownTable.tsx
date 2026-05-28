@@ -1,15 +1,22 @@
 import { Text, useStdout } from 'ink';
 import type { Token, Tokens } from 'marked';
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from './theme';
 
 // ── ANSI helpers ──────────────────────────────────────────────────
 
 const ANSI = {
     reset: '\x1b[0m',
-    bold: '\x1b[1m',
-    dim: '\x1b[2m',
-    cyan: '\x1b[36m'
+    bold: '\x1b[1m'
 };
+
+function hexToAnsi(hex: string, fallback: string): string {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return hexToAnsi(fallback, '#808080');
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `\x1b[38;2;${r};${g};${b}m`;
+}
 
 const STRIP_RE = /\x1b\[[0-9;]*m/g;
 
@@ -65,31 +72,31 @@ function padAligned(text: string, textWidth: number, colWidth: number, align: st
 
 // ── Inline token → ANSI string ────────────────────────────────────
 
-function formatInline(tokens: Token[]): string {
+function formatInline(tokens: Token[], themeColors: { accent: string; textDim: string }): string {
     return tokens
         .map((tok) => {
             switch (tok.type) {
                 case 'text':
-                    if (tok.tokens) return formatInline(tok.tokens);
+                    if (tok.tokens) return formatInline(tok.tokens, themeColors);
                     return tok.text;
                 case 'strong':
-                    return `${ANSI.bold}${tok.tokens ? formatInline(tok.tokens) : tok.text}${ANSI.reset}`;
+                    return `${ANSI.bold}${tok.tokens ? formatInline(tok.tokens, themeColors) : tok.text}${ANSI.reset}`;
                 case 'em':
-                    return `${ANSI.bold}${tok.tokens ? formatInline(tok.tokens) : tok.text}${ANSI.reset}`;
+                    return `${ANSI.bold}${tok.tokens ? formatInline(tok.tokens, themeColors) : tok.text}${ANSI.reset}`;
                 case 'codespan':
-                    return `${ANSI.cyan}${tok.text}${ANSI.reset}`;
+                    return `${hexToAnsi(themeColors.accent, themeColors.accent)}${tok.text}${ANSI.reset}`;
                 case 'link':
-                    return `${ANSI.cyan}${tok.tokens ? formatInline(tok.tokens) : tok.text}${ANSI.reset}`;
+                    return `${hexToAnsi(themeColors.accent, themeColors.accent)}${tok.tokens ? formatInline(tok.tokens, themeColors) : tok.text}${ANSI.reset}`;
                 case 'image':
-                    return `${ANSI.dim}[img: ${tok.text || tok.href}]${ANSI.reset}`;
+                    return `${hexToAnsi(themeColors.textDim, themeColors.textDim)}[img: ${tok.text || tok.href}]${ANSI.reset}`;
                 case 'del':
-                    return tok.tokens ? formatInline(tok.tokens) : tok.text;
+                    return tok.tokens ? formatInline(tok.tokens, themeColors) : tok.text;
                 case 'br':
                     return '\n';
                 case 'escape':
                     return tok.text;
                 case 'html':
-                    return `${ANSI.dim}${tok.text}${ANSI.reset}`;
+                    return `${hexToAnsi(themeColors.textDim, themeColors.textDim)}${tok.text}${ANSI.reset}`;
                 default:
                     return '';
             }
@@ -97,12 +104,12 @@ function formatInline(tokens: Token[]): string {
         .join('');
 }
 
-function formatCell(tokens: Token[] | undefined): string {
-    return tokens?.map((t) => formatInline([t])).join('') ?? '';
+function formatCell(tokens: Token[] | undefined, themeColors: { accent: string; textDim: string }): string {
+    return tokens?.map((t) => formatInline([t], themeColors)).join('') ?? '';
 }
 
 function getPlainText(tokens: Token[] | undefined): string {
-    return stripAnsi(formatCell(tokens));
+    return stripAnsi(formatCell(tokens, { accent: '', textDim: '' }));
 }
 
 // ── Column width calculation ──────────────────────────────────────
@@ -117,7 +124,9 @@ interface Props {
 
 export function MarkdownTable({ token }: Props): React.ReactNode {
     const { stdout } = useStdout();
+    const { theme } = useTheme();
     const terminalWidth = stdout?.columns ?? 80;
+    const themeColors = useMemo(() => ({ accent: theme.accent, textDim: theme.textDim }), [theme.accent, theme.textDim]);
 
     const numCols = token.header.length;
 
@@ -149,11 +158,11 @@ export function MarkdownTable({ token }: Props): React.ReactNode {
     function maxRowLines(): number {
         let max = 1;
         for (const head of token.header) {
-            max = Math.max(max, wrapText(formatCell(head.tokens), columnWidths[0]!).length);
+            max = Math.max(max, wrapText(formatCell(head.tokens, themeColors), columnWidths[0]!).length);
         }
         for (const row of token.rows) {
             row.forEach((cell, ci) => {
-                max = Math.max(max, wrapText(formatCell(cell.tokens), columnWidths[ci]!).length);
+                max = Math.max(max, wrapText(formatCell(cell.tokens, themeColors), columnWidths[ci]!).length);
             });
         }
         return max;
@@ -165,7 +174,7 @@ export function MarkdownTable({ token }: Props): React.ReactNode {
 
     function renderRowLines(cells: Array<{ tokens?: Token[] }>, isHeader: boolean): string[] {
         const cellLines = cells.map((cell, ci) => {
-            const formatted = formatCell(cell.tokens);
+            const formatted = formatCell(cell.tokens, themeColors);
             return wrapText(formatted, columnWidths[ci]!);
         });
 
@@ -214,10 +223,10 @@ export function MarkdownTable({ token }: Props): React.ReactNode {
         const wrapIndent = '  ';
 
         token.rows.forEach((row, ri) => {
-            if (ri > 0) lines.push('\x1b[2m' + '─'.repeat(sepWidth) + '\x1b[0m');
+            if (ri > 0) lines.push(hexToAnsi(themeColors.textDim, themeColors.textDim) + '─'.repeat(sepWidth) + ANSI.reset);
             row.forEach((cell, ci) => {
                 const label = headers[ci] || `Column ${ci + 1}`;
-                const value = formatCell(cell.tokens).replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+                const value = formatCell(cell.tokens, themeColors).replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
                 const firstLineWidth = Math.max(terminalWidth - label.length - 3, 10);
                 const subLineWidth = terminalWidth - wrapIndent.length - 1;
 

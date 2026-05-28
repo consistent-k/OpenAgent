@@ -1,13 +1,15 @@
 import { Text } from 'ink';
 import React, { useEffect, useState } from 'react';
+import { resolveColor, useTheme, type StringThemeKeys } from './theme';
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 interface SpinnerProps {
-    color?: string;
+    color?: StringThemeKeys | string;
 }
 
 export function Spinner({ color }: SpinnerProps) {
+    const { theme } = useTheme();
     const [frame, setFrame] = useState(0);
 
     useEffect(() => {
@@ -17,5 +19,6 @@ export function Spinner({ color }: SpinnerProps) {
         return () => clearInterval(timer);
     }, []);
 
-    return <Text color={color}>{SPINNER_FRAMES[frame]}</Text>;
+    const resolved = color ? resolveColor(color, theme) : theme.accent;
+    return <Text color={resolved}>{SPINNER_FRAMES[frame]}</Text>;
 }
