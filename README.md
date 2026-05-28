@@ -146,3 +146,7 @@ export const fooCommand: SlashCommand = {
 ## 添加新工具
 
 在 `src/agent/tools/` 下新建文件，导出 `tool({...})`，再到 `tools/index.ts` 注册。
+
+## 技术文档
+
+完整的技术文档请参阅 [docs/technical.md](docs/technical.md)，包含架构总览、数据流图、工具系统详解、安全机制等内容。
