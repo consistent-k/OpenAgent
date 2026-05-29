@@ -106,10 +106,8 @@ export function Input({
         return (
             <Box flexDirection="column">
                 <ThemedBox borderColor="border" paddingX={1}>
-                    <ThemedText color="accent" dimColor>
-                        {'> '}
-                    </ThemedText>
-                    <ThemedText dimColor>{value || '(AI 正在回复，按 Esc 或 Ctrl+C 停止…)'}</ThemedText>
+                    <ThemedText color="textDim">{'> '}</ThemedText>
+                    <ThemedText color="textDim">{value || '(AI 正在回复，按 Esc 或 Ctrl+C 停止…)'}</ThemedText>
                 </ThemedBox>
                 <Divider color="border" />
             </Box>

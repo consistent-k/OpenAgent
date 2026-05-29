@@ -11,8 +11,8 @@ export const FilePart = React.memo(function FilePart({ mediaType, url }: FilePar
     return (
         <Box marginBottom={1} paddingLeft={1}>
             <ThemedText color="accent">■</ThemedText>
-            <ThemedText dimColor> {mediaType}</ThemedText>
-            <ThemedText dimColor> {url}</ThemedText>
+            <ThemedText color="textDim"> {mediaType}</ThemedText>
+            <ThemedText color="textDim"> {url}</ThemedText>
         </Box>
     );
 });

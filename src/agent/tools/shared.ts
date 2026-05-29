@@ -22,13 +22,13 @@ export async function writeFileContent(filePath: string, content: string, overwr
         });
 
     if (existedBefore && !overwrite) {
-        throw new Error(`文件已存在：${filePath}`);
+        throw new Error(`File already exists: ${filePath}`);
     }
 
     if (existedBefore) {
         const stat = await fs.stat(resolved);
         if (!stat.isFile()) {
-            throw new Error(`路径已存在但不是文件：${filePath}`);
+            throw new Error(`Path exists but is not a file: ${filePath}`);
         }
     }
 

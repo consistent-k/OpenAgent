@@ -13,8 +13,7 @@ interface ThemePickerProps {
 const THEME_OPTIONS: { name: ThemeName; label: string }[] = [
     { name: 'dark', label: 'Dark — 深色主题' },
     { name: 'light', label: 'Light — 浅色主题' },
-    { name: '5525', label: '5525 — 五月天配色' },
-    { name: 'bubu', label: 'Bubu — 卜卜配色' }
+    { name: 'mayday', label: 'Mayday — 五月天配色' }
 ];
 
 export function ThemePicker({ current, onSelect, onCancel }: ThemePickerProps) {

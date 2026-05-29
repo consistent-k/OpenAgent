@@ -26,34 +26,39 @@ function isBlockedAddress(address: string): boolean {
 async function assertPublicHttpUrl(url: string): Promise<void> {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        throw new Error('仅支持 http 和 https URL');
+        throw new Error('Only http and https URLs are supported');
     }
 
     if (parsed.hostname === 'localhost' || parsed.hostname.endsWith('.localhost')) {
-        throw new Error('不允许请求 localhost 地址');
+        throw new Error('Requests to localhost are not allowed');
     }
 
     if (net.isIP(parsed.hostname)) {
         if (isBlockedAddress(parsed.hostname)) {
-            throw new Error('不允许请求内网或本机地址');
+            throw new Error('Requests to private/loopback addresses are not allowed');
         }
         return;
     }
 
     const addresses = await dns.lookup(parsed.hostname, { all: true });
     if (addresses.some(({ address }) => isBlockedAddress(address))) {
-        throw new Error('不允许请求解析到内网或本机的地址');
+        throw new Error('Hostname resolves to a private/loopback address');
     }
 }
 
 export const fetchTool = tool({
-    description: '获取公开 http/https URL 的响应文本或 JSON，用于读取外部网页/API 内容；可传入 prompt 指定关注点以聚焦相关段落。会阻止 localhost、内网地址和重定向，响应体有限制。',
+    description:
+        'Fetch content from a public http/https URL.\n\n' +
+        '- Returns the response text or JSON\n' +
+        '- Use the optional `prompt` parameter to specify what information to extract from the content\n' +
+        '- Blocks requests to localhost, private network addresses, and unsafe redirects\n' +
+        '- For GitHub URLs, prefer using the gh CLI via execute_bash instead (e.g., gh pr view, gh issue view, gh api)',
     inputSchema: z.object({
-        url: z.string().url().describe('要请求的公开 http/https URL，不能指向 localhost 或内网地址'),
-        method: z.enum(['GET', 'POST']).optional().describe('HTTP 方法，默认 GET'),
-        headers: z.record(z.string(), z.string()).optional().describe('可选 HTTP 请求头；默认会带 AgentFetch User-Agent'),
-        body: z.string().optional().describe('POST 请求体；GET 请求会忽略该字段'),
-        prompt: z.string().optional().describe('对获取内容的关注点描述，帮助聚焦相关信息，如 "查找 API 接口定义"、"提取版本号"')
+        url: z.string().url().describe('A fully-formed public http/https URL. Must not point to localhost or private network addresses.'),
+        method: z.enum(['GET', 'POST']).optional().describe('HTTP method. Defaults to GET.'),
+        headers: z.record(z.string(), z.string()).optional().describe('Optional HTTP headers. A default User-Agent header is included.'),
+        body: z.string().optional().describe('POST request body. Ignored for GET requests.'),
+        prompt: z.string().optional().describe('Description of what information to extract from the content. E.g., "find API endpoint definitions" or "extract version numbers".')
     }),
     execute: async ({ url, method = 'GET', headers, body, prompt }) => {
         try {
@@ -86,7 +91,7 @@ export const fetchTool = tool({
 
             if (prompt) {
                 result.prompt = prompt;
-                // 在内容中搜索与 prompt 关键词相关的段落
+                // Search for paragraphs related to prompt keywords
                 const keywords = prompt
                     .toLowerCase()
                     .split(/[\s,，、]+/)
@@ -111,9 +116,9 @@ export const fetchTool = tool({
             return result;
         } catch (error) {
             if (axios.isAxiosError(error)) {
-                throw new Error(`获取网页内容失败：${error.message}`);
+                throw new Error(`Failed to fetch URL: ${error.message}`);
             }
-            throw new Error(`获取网页内容失败：${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(`Failed to fetch URL: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 });

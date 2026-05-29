@@ -9,22 +9,21 @@ interface StatusIconProps {
     withSpace?: boolean;
 }
 
-const STATUS_CONFIG: Record<Status, { icon: string; color?: StringThemeKeys }> = {
+const STATUS_CONFIG: Record<Status, { icon: string; color: StringThemeKeys }> = {
     success: { icon: '✓', color: 'success' },
     error: { icon: '✗', color: 'error' },
     warning: { icon: '⚠', color: 'warning' },
     info: { icon: 'ℹ', color: 'suggestion' },
-    pending: { icon: '○', color: undefined },
-    loading: { icon: '…', color: undefined }
+    pending: { icon: '○', color: 'textDim' },
+    loading: { icon: '…', color: 'textDim' }
 };
 
 export function StatusIcon({ status, withSpace }: StatusIconProps) {
     const { theme } = useTheme();
     const config = STATUS_CONFIG[status];
-    const resolvedColor = config.color ? theme[config.color] : undefined;
 
     return (
-        <Text color={resolvedColor} dimColor={!config.color}>
+        <Text color={theme[config.color]}>
             {config.icon}
             {withSpace ? ' ' : ''}
         </Text>

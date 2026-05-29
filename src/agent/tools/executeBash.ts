@@ -10,14 +10,14 @@ const MAX_OUTPUT_BYTES = 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 const DANGEROUS_PATTERNS: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
-    { pattern: /\brm\s+(-[a-zA-Z]*[rRfF][a-zA-Z]*\s+)+(\/|\/\*|~|\$HOME)(\s|$)/, reason: '递归删除根目录或 HOME' },
-    { pattern: /\bmkfs(\.[a-z0-9]+)?\b/, reason: '格式化文件系统' },
-    { pattern: /\bdd\s+[^|;&]*\bof=\/dev\//, reason: '写入裸设备' },
-    { pattern: /(^|\s)sudo\s/, reason: '提权执行' },
-    { pattern: /(^|\s)su\s+-/, reason: '切换用户' },
-    { pattern: /\b(shutdown|reboot|halt|poweroff)\b/, reason: '关机/重启' },
+    { pattern: /\brm\s+(-[a-zA-Z]*[rRfF][a-zA-Z]*\s+)+(\/|\/\*|~|\$HOME)(\s|$)/, reason: 'recursive delete of root or HOME' },
+    { pattern: /\bmkfs(\.[a-z0-9]+)?\b/, reason: 'formatting filesystem' },
+    { pattern: /\bdd\s+[^|;&]*\bof=\/dev\//, reason: 'writing to raw device' },
+    { pattern: /(^|\s)sudo\s/, reason: 'privileged execution' },
+    { pattern: /(^|\s)su\s+-/, reason: 'switching user' },
+    { pattern: /\b(shutdown|reboot|halt|poweroff)\b/, reason: 'shutdown/reboot' },
     { pattern: /:\s*\(\s*\)\s*\{[^}]*:\s*\|\s*:[^}]*\}\s*;\s*:/, reason: 'fork bomb' },
-    { pattern: />\s*\/dev\/(sd[a-z]|nvme|disk)/, reason: '覆盖物理磁盘' }
+    { pattern: />\s*\/dev\/(sd[a-z]|nvme|disk)/, reason: 'overwriting physical disk' }
 ];
 
 const READONLY_COMMANDS = new Set([
@@ -92,7 +92,7 @@ function isReadonlyCommand(command: string): boolean {
 function assertSafe(command: string): void {
     for (const { pattern, reason } of DANGEROUS_PATTERNS) {
         if (pattern.test(command)) {
-            throw new Error(`拒绝执行危险命令（${reason}）：${command}`);
+            throw new Error(`Refused to execute dangerous command (${reason}): ${command}`);
         }
     }
 }
@@ -110,22 +110,30 @@ function tail(text: string, maxBytes: number): { text: string; cut: boolean } {
     }
 
     return {
-        text: `...(输出截断，剩余 ${Math.round((bytes - maxBytes) / 1024)}KB 省略)\n\n${buf.subarray(start).toString('utf-8')}`,
+        text: `...(output truncated, ${Math.round((bytes - maxBytes) / 1024)}KB omitted)\n\n${buf.subarray(start).toString('utf-8')}`,
         cut: true
     };
 }
 
 export const executeBashTool = tool({
     description:
-        '在工作目录内执行命令行工具以查看信息或调用 CLI 工具（如 antd、npx、tsx 等）。支持管道 |、链式执行 &&/||、输出重定向 >/>>/2>/2>>。禁止危险操作（rm -rf /、sudo、mkfs 等）。复杂文件读取优先用 read_file，文件修改优先用 write_file 或 edit_file。',
+        'Executes a given bash command and returns its output.\n\n' +
+        "The working directory persists between commands, but shell state does not. The shell environment is initialized from the user's profile.\n\n" +
+        'IMPORTANT: Avoid using this tool to run `grep`, `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands, unless explicitly instructed. Instead, use the appropriate dedicated tool:\n' +
+        '- File search: Use glob (NOT find or ls)\n' +
+        '- Content search: Use grep (NOT grep or rg)\n' +
+        '- Read files: Use read_file (NOT cat/head/tail)\n' +
+        '- Edit files: Use edit_file (NOT sed/awk)\n' +
+        '- Write files: Use write_file (NOT echo/cat)\n\n' +
+        'Supports pipes |, chaining &&/||, and output redirection >/>>/2>/2>>. Dangerous operations (rm -rf, sudo, mkfs, etc.) are blocked.',
     needsApproval: ({ command }) => !isReadonlyCommand(command),
     inputSchema: z.object({
         command: z
             .string()
             .describe(
-                '命令及参数，如 "ls src"、"which node"、"npx antd usage ./src"、"ls | grep .ts"、"echo hello > output.txt && cat output.txt"；支持管道 |、链式执行 &&/||、输出重定向 >/>>/2>/2>>'
+                'The bash command to execute. E.g., "ls src", "which node", "npx antd usage ./src", "ls | grep .ts", "echo hello > output.txt && cat output.txt". Supports pipes |, chaining &&/||, output redirection >/>>/2>/2>>.'
             ),
-        timeout: z.number().int().positive().optional().describe('超时时间（毫秒），默认 30000')
+        timeout: z.number().int().positive().optional().describe('Timeout in milliseconds. Defaults to 30000.')
     }),
     execute: async ({ command, timeout }, { abortSignal }) => {
         const effectiveTimeout = timeout ?? DEFAULT_TIMEOUT_MS;

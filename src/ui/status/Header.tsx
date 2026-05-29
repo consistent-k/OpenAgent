@@ -44,16 +44,14 @@ export function Header({ status, fileIndexStatus, fileIndexCount, pendingApprova
                     ▍ {APP_NAME}
                 </ThemedText>
                 <Box>
-                    <ThemedText dimColor>model: </ThemedText>
-                    <ThemedText color="accent" dimColor>
-                        {safeModelName()}
-                    </ThemedText>
-                    <ThemedText dimColor> | </ThemedText>
+                    <ThemedText color="textDim">model: </ThemedText>
+                    <ThemedText color="accent">{safeModelName()}</ThemedText>
+                    <ThemedText color="subtle"> | </ThemedText>
                     <StatusIcon status={indexInfo.icon} />
-                    <ThemedText dimColor>{indexInfo.text}</ThemedText>
-                    <ThemedText dimColor> | </ThemedText>
+                    <ThemedText color="textDim">{indexInfo.text}</ThemedText>
+                    <ThemedText color="subtle"> | </ThemedText>
                     <StatusIcon status={runState.icon} />
-                    <ThemedText dimColor>{runState.text}</ThemedText>
+                    <ThemedText color="textDim">{runState.text}</ThemedText>
                 </Box>
             </Box>
             <Divider />

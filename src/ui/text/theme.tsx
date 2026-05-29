@@ -77,26 +77,26 @@ const lightTheme: Theme = {
     }
 };
 
-// 五月天 5525 五球配色
-// 冠佑蓝 #26a7e1 / 石头绿 #13AF68 / 怪兽红 #E95412 / 玛莎黄 #FFE009 / 阿信粉 #e274a9
+// 五月天 5525 五球配色（融合卜卜橙绿）
+// 冠佑蓝 #26a7e1 / 石头绿 #13AF68 / 怪兽红 #E95412 / 玛莎黄 #FFE009 / 阿信粉 #e274a9 / 卜卜橙 #FF8C42
 const maydayTheme: Theme = {
     accent: '#26a7e1',
-    accentDim: '#5bc0e8',
+    accentDim: '#FF8C42',
     suggestion: '#e274a9',
     success: '#13AF68',
     warning: '#FFE009',
     error: '#E95412',
     inactive: '#808080',
-    subtle: '#3A3520',
+    subtle: '#4A4535',
     text: '#E8E0D0',
-    textDim: '#9E9585',
-    border: '#4A4535',
+    textDim: '#B5A994',
+    border: '#5A5545',
     surface: '#1E1C16',
     syntax: {
         keyword: '#e274a9',
-        string: '#26a7e1',
-        comment: '#13AF68',
-        function: '#26a7e1',
+        string: '#A5D6A7',
+        comment: '#66BB6A',
+        function: '#FFB74D',
         number: '#FFE009',
         type: '#13AF68',
         operator: '#E8E0D0',
@@ -104,37 +104,11 @@ const maydayTheme: Theme = {
     }
 };
 
-// 卜卜配色 — 橙色身体 + 绿色叶子
-const bubuTheme: Theme = {
-    accent: '#FF8C42',
-    accentDim: '#FFAA70',
-    suggestion: '#FF8C42',
-    success: '#4CAF50',
-    warning: '#FFC107',
-    error: '#FF5252',
-    inactive: '#888888',
-    subtle: '#3A3228',
-    text: '#F0E6D8',
-    textDim: '#A89880',
-    border: '#4A4038',
-    surface: '#2A2420',
-    syntax: {
-        keyword: '#FF8C42',
-        string: '#A5D6A7',
-        comment: '#66BB6A',
-        function: '#FFB74D',
-        number: '#81C784',
-        type: '#4CAF50',
-        operator: '#F0E6D8',
-        punctuation: '#F0E6D8'
-    }
-};
+export type ThemeName = 'dark' | 'light' | 'mayday';
 
-export type ThemeName = 'dark' | 'light' | '5525' | 'bubu';
+const themeOrder: ThemeName[] = ['dark', 'light', 'mayday'];
 
-const themeOrder: ThemeName[] = ['dark', 'light', '5525', 'bubu'];
-
-const themes: Record<ThemeName, Theme> = { dark: darkTheme, light: lightTheme, '5525': maydayTheme, bubu: bubuTheme };
+const themes: Record<ThemeName, Theme> = { dark: darkTheme, light: lightTheme, mayday: maydayTheme };
 
 interface ThemeContextValue {
     themeName: ThemeName;
@@ -151,7 +125,7 @@ const ThemeContext = createContext<ThemeContextValue>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-    const [themeName, setThemeName] = useState<ThemeName>('5525');
+    const [themeName, setThemeName] = useState<ThemeName>('mayday');
     const toggleTheme = () =>
         setThemeName((t) => {
             const idx = themeOrder.indexOf(t);

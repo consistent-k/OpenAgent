@@ -4,8 +4,8 @@ import { findCommand, COMMANDS, parseCommandInput } from './commands';
 import { useChatStream } from './hooks/useChatStream';
 import { useFileIndex } from './hooks/useFileIndex';
 import { Input } from './ui/chat/Input';
-import { PartRenderer } from './ui/messages';
 import { MessageList } from './ui/messages/MessageList';
+import { PartRenderer } from './ui/messages/PartRenderer';
 import { Header } from './ui/status/Header';
 import { StatusBar } from './ui/status/StatusBar';
 import { ThemeProvider, useTheme, type ThemeName } from './ui/text/theme';
@@ -34,6 +34,7 @@ function AppContent() {
 
     const [inputValue, setInputValue] = useState('');
     const [showReasoning, setShowReasoning] = useState(false);
+    const [showToolDetails, setShowToolDetails] = useState(false);
     const [sessionPicker, setSessionPicker] = useState<SessionSummary[] | null>(null);
     const [themePickerOpen, setThemePickerOpen] = useState(false);
 
@@ -91,6 +92,8 @@ function AppContent() {
     useInput((input, key) => {
         if (key.ctrl && input === 'r') {
             setShowReasoning((v) => !v);
+        } else if (key.ctrl && input === 'o') {
+            setShowToolDetails((v) => !v);
         } else if ((key.ctrl && input === 'c') || key.escape) {
             if (status === 'streaming' || status === 'awaiting_approval') {
                 cancel();
@@ -173,7 +176,7 @@ function AppContent() {
     return (
         <Box flexDirection="column">
             <Header status={status} fileIndexStatus={fileIndexStatus} fileIndexCount={fileIndex.length} pendingApproval={pendingApproval !== null} />
-            {historyMessages.length > 0 && <MessageList messages={historyMessages} showReasoning={showReasoning} />}
+            {historyMessages.length > 0 && <MessageList messages={historyMessages} showReasoning={showReasoning} showToolDetails={showToolDetails} />}
             {streamingMessage && (
                 <Box flexDirection="column" paddingX={1}>
                     <Box flexDirection="column" marginBottom={1}>

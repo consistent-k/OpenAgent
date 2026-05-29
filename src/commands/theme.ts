@@ -2,7 +2,7 @@ import type { ThemeName } from '../ui/text/theme';
 import { uid } from '../utils/uid';
 import type { SlashCommand } from './registry';
 
-const THEME_NAMES: ThemeName[] = ['dark', 'light', '5525', 'bubu'];
+const THEME_NAMES: ThemeName[] = ['dark', 'light', 'mayday'];
 
 export const themeCommand: SlashCommand = {
     name: '/theme',

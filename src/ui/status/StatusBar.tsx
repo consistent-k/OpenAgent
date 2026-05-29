@@ -58,16 +58,16 @@ export function StatusBar({ cwd, modelId, usage }: StatusBarProps) {
                     {branch}
                 </Text>
             ) : null}
-            <Text color={theme.border}>{' | '}</Text>
+            <Text color={theme.subtle}>{' | '}</Text>
             <Text color={theme.suggestion}>{modelId}</Text>
-            <Text color={theme.border}>{' | '}</Text>
+            <Text color={theme.subtle}>{' | '}</Text>
             {usage ? (
                 <>
                     <Text color={theme.textDim}>in:</Text>
                     <Text color={theme.accent}> {fmt(usage.inputTokens)} </Text>
                     <Text color={theme.textDim}>out:</Text>
                     <Text color={theme.success}> {fmt(usage.outputTokens)} </Text>
-                    <Text color={theme.border}>| </Text>
+                    <Text color={theme.subtle}>| </Text>
                     <Text color={usageColor}>{fmt(total)}</Text>
                     <Text color={theme.textDim}> ({pctFormatted}%)</Text>
                 </>

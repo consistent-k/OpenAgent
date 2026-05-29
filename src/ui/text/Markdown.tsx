@@ -55,7 +55,7 @@ function renderInline(tokens: Token[], themeColors: { accent: string; textDim: s
                 return <Text key={i}>{tok.text}</Text>;
             case 'image':
                 return (
-                    <Text key={i} color={themeColors.textDim} dimColor>
+                    <Text key={i} color={themeColors.textDim}>
                         [img: {tok.text || tok.href}]
                     </Text>
                 );
@@ -192,7 +192,7 @@ export function Markdown({ text, dimColor }: MarkdownProps) {
                     case 'blockquote':
                         return (
                             <Box key={i} flexDirection="row">
-                                <Text dimColor>{'\u258E'} </Text>
+                                <Text color={theme.subtle}>{'\u258E'} </Text>
                                 <Box flexGrow={1}>
                                     {(tok as Tokens.Blockquote).tokens.length > 0 ? (
                                         <ParagraphBlock tokens={(tok as Tokens.Blockquote).tokens} dimColor={dimColor} themeColors={themeColors} />
@@ -204,7 +204,7 @@ export function Markdown({ text, dimColor }: MarkdownProps) {
                         );
                     case 'hr':
                         return (
-                            <Text key={i} dimColor>
+                            <Text key={i} color={theme.subtle}>
                                 {'\u2500\u2500\u2500'}
                             </Text>
                         );

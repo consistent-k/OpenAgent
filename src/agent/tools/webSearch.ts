@@ -11,7 +11,7 @@ interface SearchResult {
 function parseDuckDuckGoHtml(html: string, maxResults: number): SearchResult[] {
     const results: SearchResult[] = [];
 
-    // 匹配 DuckDuckGo HTML 结果块
+    // Match DuckDuckGo HTML result blocks
     const resultRegex = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
 
     let match: RegExpExecArray | null;
@@ -20,7 +20,7 @@ function parseDuckDuckGoHtml(html: string, maxResults: number): SearchResult[] {
         const title = match[2].replace(/<[^>]+>/g, '').trim();
         const snippet = match[3].replace(/<[^>]+>/g, '').trim();
 
-        // DuckDuckGo 的链接可能是重定向 URL，尝试提取真实 URL
+        // DuckDuckGo links may be redirect URLs — try to extract the real URL
         const uddgMatch = url.match(/[?&]uddg=([^&]+)/);
         if (uddgMatch) {
             url = decodeURIComponent(uddgMatch[1]);
@@ -39,7 +39,7 @@ async function searchViaApi(query: string, maxResults: number): Promise<{ result
     const apiKey = process.env.OPENAGENT_SEARCH_API_KEY;
 
     if (!apiUrl) {
-        throw new Error('未配置搜索 API');
+        throw new Error('Search API not configured');
     }
 
     const response = await axios.get(apiUrl, {
@@ -50,7 +50,7 @@ async function searchViaApi(query: string, maxResults: number): Promise<{ result
 
     const data = response.data;
 
-    // 通用解析：尝试 Brave Search 格式
+    // Try Brave Search response format
     if (data.web?.results) {
         return {
             results: data.web.results.slice(0, maxResults).map((r: { title: string; url: string; description?: string }) => ({
@@ -62,7 +62,7 @@ async function searchViaApi(query: string, maxResults: number): Promise<{ result
         };
     }
 
-    // 尝试通用数组格式
+    // Try generic array format
     if (Array.isArray(data.results)) {
         return {
             results: data.results.slice(0, maxResults).map((r: { title: string; url: string; snippet?: string; description?: string }) => ({
@@ -74,7 +74,7 @@ async function searchViaApi(query: string, maxResults: number): Promise<{ result
         };
     }
 
-    throw new Error('无法解析搜索 API 响应格式');
+    throw new Error('Unable to parse search API response format');
 }
 
 async function searchViaDuckDuckGo(query: string, maxResults: number): Promise<{ results: SearchResult[]; provider: string }> {
@@ -93,10 +93,15 @@ async function searchViaDuckDuckGo(query: string, maxResults: number): Promise<{
 }
 
 export const webSearchTool = tool({
-    description: '搜索互联网获取实时信息。输入搜索查询词，返回相关网页的标题、链接和摘要。用于需要最新信息、文档查询或了解未知内容的场景。',
+    description:
+        'Search the web and use the results to inform your responses.\n\n' +
+        '- Provides up-to-date information for current events and recent data\n' +
+        '- Returns search results with titles, URLs, and snippets\n' +
+        '- Use this tool for accessing information beyond your knowledge cutoff\n' +
+        '- After answering, include a "Sources:" section listing relevant URLs as markdown links',
     inputSchema: z.object({
-        query: z.string().min(2).describe('搜索查询词，如 "React 19 新特性" 或 "typescript generic constraints"'),
-        max_results: z.number().int().min(1).max(10).optional().describe('最大结果数，默认 5')
+        query: z.string().min(2).describe('Search query. E.g., "React 19 new features" or "typescript generic constraints".'),
+        max_results: z.number().int().min(1).max(10).optional().describe('Maximum number of results to return. Defaults to 5.')
     }),
     execute: async ({ query, max_results }) => {
         const maxResults = max_results ?? 5;
@@ -115,7 +120,7 @@ export const webSearchTool = tool({
                     query,
                     results: [],
                     provider: result.provider,
-                    message: '未找到相关结果'
+                    message: 'No results found'
                 };
             }
 
@@ -125,7 +130,7 @@ export const webSearchTool = tool({
                 provider: result.provider
             };
         } catch (error) {
-            throw new Error(`搜索失败：${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(`Search failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 });

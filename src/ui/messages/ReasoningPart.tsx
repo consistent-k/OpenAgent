@@ -1,6 +1,7 @@
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
 import React from 'react';
 import { Markdown } from '../text/Markdown';
+import { ThemedText } from '../text/ThemedText';
 
 interface ReasoningPartProps {
     text: string;
@@ -15,19 +16,19 @@ export const ReasoningPart = React.memo(function ReasoningPart({ text, state, sh
         const label = isStreaming ? 'Thinking\u2026' : 'Completed thinking';
         return (
             <Box marginBottom={1} paddingLeft={1}>
-                <Text dimColor italic>
+                <ThemedText color="textDim" italic>
                     {'\u2234'} {label}
-                    <Text dimColor> (Ctrl+R)</Text>
-                </Text>
+                    <ThemedText color="subtle"> (Ctrl+R)</ThemedText>
+                </ThemedText>
             </Box>
         );
     }
 
     return (
         <Box marginBottom={1} paddingLeft={1} flexDirection="column">
-            <Text dimColor italic>
+            <ThemedText color="textDim" italic>
                 {'\u2234'} Thinking{isStreaming ? '\u2026' : ''}
-            </Text>
+            </ThemedText>
             <Box paddingLeft={2}>
                 <Markdown text={text} dimColor />
             </Box>

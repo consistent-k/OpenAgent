@@ -53,10 +53,10 @@ export const ToolCallPart = React.memo(function ToolCallPart({ part }: ToolCallP
             <Box flexDirection="row">
                 <ThemedText>
                     <ThemedText color={meta.color}>{meta.icon}</ThemedText> {label}
-                    <ThemedText dimColor>{head}</ThemedText>
+                    <ThemedText color="textDim">{head}</ThemedText>
                     {isTerminal && previewLines.length > 0 && (
                         <ThemedText>
-                            <ThemedText dimColor> — </ThemedText>
+                            <ThemedText color="subtle"> — </ThemedText>
                             <ThemedText color={meta.color}>{previewLines[0]}</ThemedText>
                         </ThemedText>
                     )}
@@ -65,11 +65,11 @@ export const ToolCallPart = React.memo(function ToolCallPart({ part }: ToolCallP
             {previewLines.length > 1 && (
                 <Box paddingLeft={3} flexDirection="column">
                     {previewLines.slice(1).map((line, i) => (
-                        <ThemedText key={i} dimColor>
+                        <ThemedText key={i} color="textDim">
                             {line}
                         </ThemedText>
                     ))}
-                    {hasMore && <ThemedText dimColor>... ({lines.length - MAX_PREVIEW_LINES} more lines)</ThemedText>}
+                    {hasMore && <ThemedText color="textDim">... ({lines.length - MAX_PREVIEW_LINES} more lines)</ThemedText>}
                 </Box>
             )}
         </Box>

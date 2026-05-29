@@ -8,7 +8,7 @@ import { resolveSafePath, ROOT_DIR } from '@/utils/safe-path';
 const DEFAULT_MAX_MATCHES = 200;
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 
-/** 简易 glob 匹配，支持 * 和 ? */
+/** Simple glob matching, supports * and ? */
 function matchesGlob(filename: string, pattern: string): boolean {
     const regexStr = pattern
         .replace(/[.+^${}()|[\]\\]/g, '\\$&')
@@ -56,19 +56,25 @@ async function searchFileLines(filePath: string, regex: RegExp, context: number,
 }
 
 export const grepTool = tool({
-    description: '在工作目录内的文件或目录中搜索文本内容。支持正则表达式、上下文行显示、文件 glob 过滤和多种输出模式。用于查找代码中的关键字、函数引用、配置项等。',
+    description:
+        'A powerful search tool for finding text content in files.\n\n' +
+        'Usage:\n' +
+        '- Supports full regex syntax (e.g., "log.*Error", "function\\\\s+\\\\w+")\n' +
+        '- Filter files with glob parameter (e.g., "*.js", "**/*.tsx")\n' +
+        '- Output modes: "content" shows matching lines (default), "files_with_matches" shows only file paths, "count" shows match counts\n' +
+        '- Use for finding keywords, function references, configuration values in code',
     inputSchema: z.object({
-        pattern: z.string().describe('要搜索的关键词或 JavaScript 正则表达式模式'),
-        path: z.string().describe('工作目录内的相对文件或目录路径'),
-        caseSensitive: z.boolean().optional().describe('是否区分大小写，默认 true'),
-        recursive: z.boolean().optional().describe('path 是目录时是否递归搜索全部子目录，默认 false'),
-        glob: z.string().optional().describe('文件名 glob 过滤，如 "*.ts"、"*.json"，仅在目录搜索时生效'),
-        context: z.number().int().min(0).max(20).optional().describe('匹配行前后各显示 N 行上下文，默认 0'),
-        head_limit: z.number().int().min(1).optional().describe('限制返回总匹配行数，默认 200'),
+        pattern: z.string().describe('Keyword or JavaScript regex pattern to search for'),
+        path: z.string().describe('Relative file or directory path within the working directory'),
+        caseSensitive: z.boolean().optional().describe('Whether the search is case-sensitive. Defaults to true.'),
+        recursive: z.boolean().optional().describe('When path is a directory, whether to search all subdirectories recursively. Defaults to false.'),
+        glob: z.string().optional().describe('File name glob filter (e.g., "*.ts", "*.json"). Only applies when searching directories.'),
+        context: z.number().int().min(0).max(20).optional().describe('Number of context lines to show before and after each match. Defaults to 0.'),
+        head_limit: z.number().int().min(1).optional().describe('Maximum total number of matching lines to return. Defaults to 200.'),
         output_mode: z
             .enum(['content', 'files_with_matches', 'count'])
             .optional()
-            .describe('输出模式：content 返回匹配行（默认），files_with_matches 只返回包含匹配的文件路径，count 返回每个文件的匹配计数')
+            .describe('Output mode: "content" returns matching lines (default), "files_with_matches" returns only file paths with matches, "count" returns match counts per file.')
     }),
     execute: async ({ pattern, path: searchPath, caseSensitive = true, recursive = false, glob, context = 0, head_limit, output_mode = 'content' }) => {
         const maxMatches = head_limit ?? DEFAULT_MAX_MATCHES;
@@ -80,7 +86,7 @@ export const grepTool = tool({
         try {
             regex = new RegExp(pattern, flags);
         } catch (error) {
-            throw new Error(`无效正则表达式：${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(`Invalid regex pattern: ${error instanceof Error ? error.message : String(error)}`);
         }
 
         async function loadLines(filePath: string): Promise<string[] | null> {
@@ -123,7 +129,7 @@ export const grepTool = tool({
                         results.push(result);
                         totalLines += result.matches.length;
                         if (totalLines >= maxMatches) {
-                            // 截断最后文件的多余匹配
+                            // Truncate excess matches from the last file
                             const excess = totalLines - maxMatches;
                             if (excess > 0) {
                                 result.matches = result.matches.slice(0, result.matches.length - excess);
@@ -144,7 +150,7 @@ export const grepTool = tool({
 
         if (stat.isFile()) {
             const lines = await loadLines(resolved);
-            if (!lines) throw new Error(`无法读取文件：${searchPath}`);
+            if (!lines) throw new Error(`Cannot read file: ${searchPath}`);
 
             const matches = await searchFileLines(resolved, regex, context, lines);
 
@@ -178,6 +184,6 @@ export const grepTool = tool({
             return { path: searchPath, pattern, results, totalMatches, truncated: totalMatches >= maxMatches };
         }
 
-        throw new Error(`路径不存在或不是文件/目录：${searchPath}`);
+        throw new Error(`Path does not exist or is not a file/directory: ${searchPath}`);
     }
 });

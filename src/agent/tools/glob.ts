@@ -13,10 +13,10 @@ function toPosixPath(filePath: string): string {
 
 function assertSafePattern(pattern: string): void {
     if (path.isAbsolute(pattern)) {
-        throw new Error('glob 模式必须是相对路径');
+        throw new Error('glob pattern must be a relative path');
     }
     if (pattern.split(/[\\/]+/).includes('..')) {
-        throw new Error('glob 模式不能包含上级目录引用');
+        throw new Error('glob pattern cannot contain ".."');
     }
 }
 
@@ -52,10 +52,15 @@ function globToRegex(glob: string): RegExp {
 }
 
 export const globTool = tool({
-    description: '在工作目录内按 glob 模式查找文件路径，返回匹配的相对路径；支持 *、?、**。用于按文件名/路径模式找文件，不读取文件内容。',
+    description:
+        'Fast file pattern matching tool that works with any codebase size.\n\n' +
+        '- Supports glob patterns like "**/*.js" or "src/**/*.ts"\n' +
+        '- Returns matching file paths sorted alphabetically\n' +
+        '- Use this tool when you need to find files by name patterns\n' +
+        '- Does not read file contents — only finds paths by pattern',
     inputSchema: z.object({
-        pattern: z.string().describe('相对 glob 模式，不能是绝对路径或包含 ..，如 "**/*.ts" 或 "src/**/*.md"'),
-        path: z.string().optional().describe('工作目录内的相对起始目录，默认为当前工作目录')
+        pattern: z.string().describe('Relative glob pattern. Cannot be absolute or contain "..". E.g., "**/*.ts" or "src/**/*.md".'),
+        path: z.string().optional().describe('Relative starting directory within the working directory. Defaults to the working directory root.')
     }),
     execute: async ({ pattern, path: searchDir }) => {
         assertSafePattern(pattern);
@@ -69,7 +74,7 @@ export const globTool = tool({
             for (const entry of entries) {
                 if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
                 const entryPath = path.join(dir, entry.name);
-                // 使用 lstat 避免跟随 symlink
+                // Use lstat to avoid following symlinks
                 const lstat = await fs.lstat(entryPath);
                 if (lstat.isDirectory()) {
                     await walkDir(entryPath);
