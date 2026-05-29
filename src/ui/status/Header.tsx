@@ -1,11 +1,34 @@
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import React from 'react';
 import { APP_NAME, getModelName } from '../../config';
 import type { ChatStatus } from '../../hooks/useChatStream';
 import type { FileIndexStatus } from '../../hooks/useFileIndex';
 import { Divider } from '../text/Divider';
+import { useTheme } from '../text/theme';
 import { ThemedText } from '../text/ThemedText';
 import { StatusIcon } from './StatusIcon';
+
+/** 五月天五球配色 */
+const MAYDAY_BALLS = [
+    { name: '冠佑', color: '#26a7e1' },
+    { name: '怪兽', color: '#E95412' },
+    { name: '阿信', color: '#e274a9' },
+    { name: '玛莎', color: '#FFE009' },
+    { name: '石头', color: '#13AF68' }
+] as const;
+
+/** 五月天五球装饰 */
+function MaydayBalls() {
+    return (
+        <Box flexDirection="row" gap={1}>
+            {MAYDAY_BALLS.map((ball) => (
+                <Text key={ball.name} color={ball.color} bold>
+                    ●
+                </Text>
+            ))}
+        </Box>
+    );
+}
 
 interface HeaderProps {
     status: ChatStatus;
@@ -29,6 +52,7 @@ function safeModelName(): string {
 }
 
 export function Header({ status, fileIndexStatus, fileIndexCount, pendingApproval }: HeaderProps) {
+    const { themeName } = useTheme();
     const runState = pendingApproval
         ? { text: 'awaiting approval', icon: 'warning' as const }
         : status === 'streaming'
@@ -39,10 +63,13 @@ export function Header({ status, fileIndexStatus, fileIndexCount, pendingApprova
 
     return (
         <Box flexDirection="column">
-            <Box borderStyle="round" paddingX={1} justifyContent="space-between">
-                <ThemedText bold color="accent">
-                    ▍ {APP_NAME}
-                </ThemedText>
+            <Box justifyContent="space-between" paddingX={1} paddingY={1}>
+                <Box flexDirection="row" alignItems="center" gap={1}>
+                    <ThemedText bold color="accent">
+                        ▍ {APP_NAME}
+                    </ThemedText>
+                    {themeName === 'mayday' && <MaydayBalls />}
+                </Box>
                 <Box>
                     <ThemedText color="textDim">model: </ThemedText>
                     <ThemedText color="accent">{safeModelName()}</ThemedText>
