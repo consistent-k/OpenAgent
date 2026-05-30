@@ -36,4 +36,4 @@ export function findCommand(name: string): SlashCommand | undefined {
     return COMMANDS.find((c) => c.name === name);
 }
 
-export type { SlashCommand, CommandContext } from './registry';
+export type { SlashCommand } from './registry';

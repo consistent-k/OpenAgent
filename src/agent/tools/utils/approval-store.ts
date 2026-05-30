@@ -6,7 +6,7 @@ const APPROVALS_PATH = path.join(getOpenAgentDir(), 'approvals.json');
 
 export const APPROVABLE_TOOLS = ['execute_bash', 'write_file', 'edit_file'] as const;
 
-export type ApprovableToolName = (typeof APPROVABLE_TOOLS)[number];
+type ApprovableToolName = (typeof APPROVABLE_TOOLS)[number];
 
 interface ApprovalPreferences {
     execute_bash?: boolean;

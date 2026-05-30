@@ -105,7 +105,7 @@ src/
 ├── ui/                 # Ink UI 组件
 │   ├── chat/           # 聊天交互（输入框、命令面板、确认对话框、文件选择器等）
 │   ├── messages/       # 消息渲染（文本、工具调用、推理过程、文件内容）
-│   ├── status/         # 状态栏（Header、StatusBar、ProgressBar 等）
+│   ├── status/         # 状态栏（Header、StatusBar 等）
 │   └── text/           # 文本 & 主题基础组件（Markdown、ThemedBox、Spinner 等）
 └── utils/              # 工具函数（文件索引、@mention 解析、会话持久化等）
 ```

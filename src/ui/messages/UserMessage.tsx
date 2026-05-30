@@ -3,11 +3,10 @@ import React from 'react';
 import { ThemedText } from '../text/ThemedText';
 
 interface UserMessageProps {
-    id: string;
     text: string;
 }
 
-export const UserMessage = React.memo(function UserMessage({ id: _id, text }: UserMessageProps) {
+export const UserMessage = React.memo(function UserMessage({ text }: UserMessageProps) {
     return (
         <Box marginBottom={1} paddingLeft={1}>
             <ThemedText bold>

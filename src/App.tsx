@@ -1,5 +1,5 @@
 import { Box, useApp, useInput } from 'ink';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { findCommand, COMMANDS, parseCommandInput } from './commands';
 import { getConfigSummary, saveConfig, reloadConfig, isConfigReady, type OpenAgentConfig } from './config';
 import { useChatStream } from './hooks/useChatStream';
@@ -11,6 +11,7 @@ import { PartRenderer } from './ui/messages/PartRenderer';
 import { Header } from './ui/status/Header';
 import { StatusBar } from './ui/status/StatusBar';
 import { ThemeProvider, useTheme, type ThemeName } from './ui/text/theme';
+import { getErrorMessage } from './utils/errors';
 import { loadSession, saveSession } from './utils/sessions';
 import type { SessionSummary } from './utils/sessions';
 import { uid } from './utils/uid';
@@ -117,10 +118,9 @@ function AppContent() {
                     { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `已更新配置 ${key}：${key === 'apiKey' ? '****' : value}`, state: 'done' }] }
                 ]);
             } catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
                 appendMessages([
                     { id: uid(), role: 'user', parts: [{ type: 'text', text: `/config` }] },
-                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `保存配置失败：${message}`, state: 'done' }] }
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `保存配置失败：${getErrorMessage(error)}`, state: 'done' }] }
                 ]);
             }
         },
@@ -232,10 +232,9 @@ function AppContent() {
                         }
                     });
                 } catch (error) {
-                    const message = error instanceof Error ? error.message : String(error);
                     appendMessages([
                         { id: uid(), role: 'user', parts: [{ type: 'text', text: trimmed }] },
-                        { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `[命令错误] ${message}`, state: 'done' }] }
+                        { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `[命令错误] ${getErrorMessage(error)}`, state: 'done' }] }
                     ]);
                 }
                 return;

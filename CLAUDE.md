@@ -116,9 +116,7 @@ src/
 │   │   ├── index.ts
 │   │   ├── Header.tsx         # 顶部状态栏
 │   │   ├── StatusBar.tsx      # 底部状态栏
-│   │   ├── ProgressBar.tsx    # 进度条
-│   │   ├── StatusIcon.tsx     # 状态图标
-│   │   └── LoadingState.tsx   # 加载状态
+│   │   └── StatusIcon.tsx     # 状态图标
 │   └── text/              # 文本 & 主题基础组件
 │       ├── index.ts
 │       ├── theme.tsx          # 主题系统定义
@@ -132,9 +130,7 @@ src/
 │       ├── Pane.tsx           # 面板容器
 │       ├── Byline.tsx         # 标注行
 │       ├── ListItem.tsx       # 列表项
-│       ├── KeyboardShortcutHint.tsx # 键盘快捷键提示
-│       ├── useInverseColor.ts # 反色 hook
-│       └── useSyntaxColor.ts  # 语法高亮色 hook
+│       └── KeyboardShortcutHint.tsx # 键盘快捷键提示
 └── utils/
     ├── files.ts           # 文件索引 / @mention 解析
     ├── markdown.ts        # Markdown 渲染工具

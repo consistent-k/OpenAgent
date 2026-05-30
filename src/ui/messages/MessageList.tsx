@@ -20,7 +20,7 @@ export const MessageList = React.memo(function MessageList({ messages, showReaso
                 <Box key={msg.id} flexDirection="column">
                     {mi > 0 && <Divider padding={1} />}
                     {msg.role === 'user' ? (
-                        <UserMessage id={msg.id} text={(msg.parts[0] as TextUIPart | undefined)?.text ?? ''} />
+                        <UserMessage text={(msg.parts[0] as TextUIPart | undefined)?.text ?? ''} />
                     ) : (
                         <Box flexDirection="column" marginBottom={1}>
                             {groupParts(msg.parts).map((group) => {

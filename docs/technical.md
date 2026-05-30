@@ -129,9 +129,7 @@ OpenAgent/
 │   │   ├── status/                  # 状态栏组件
 │   │   │   ├── Header.tsx           # 顶部栏
 │   │   │   ├── StatusBar.tsx        # 底部栏
-│   │   │   ├── ProgressBar.tsx      # 进度条
-│   │   │   ├── StatusIcon.tsx       # 状态图标
-│   │   │   └── LoadingState.tsx     # 加载状态
+│   │   │   └── StatusIcon.tsx       # 状态图标
 │   │   └── text/                    # 基础组件 + 主题
 │   │       ├── theme.tsx            # 主题定义 + Context
 │   │       ├── ThemedBox.tsx        # 主题化 Box

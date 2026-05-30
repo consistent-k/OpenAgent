@@ -18,9 +18,6 @@ export async function runAgent(messages: ModelMessage[], abortSignal?: AbortSign
         },
         abortSignal,
         maxRetries: 10,
-        onError: ({ error: _error }) => {
-            // 记录错误信息，但不阻止错误传播到 UI
-            // console.error('Stream error:', error);
-        }
+        onError: () => {}
     });
 }

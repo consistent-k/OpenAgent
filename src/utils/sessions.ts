@@ -9,7 +9,7 @@ const SESSION_VERSION = 1;
 
 let cachedBranch: string | null = null;
 
-export interface SavedSession {
+interface SavedSession {
     version: number;
     name: string;
     cwd: string;
@@ -36,10 +36,6 @@ export async function getBranch(): Promise<string> {
         cachedBranch = 'default';
         return cachedBranch;
     }
-}
-
-export function clearBranchCache(): void {
-    cachedBranch = null;
 }
 
 function sanitizeName(name: string): string {

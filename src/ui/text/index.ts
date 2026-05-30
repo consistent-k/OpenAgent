@@ -1,6 +1,4 @@
 export { ThemeProvider, useTheme, resolveColor, type Theme, type ThemeName, type SyntaxColors, type StringThemeKeys } from './theme';
-export { useSyntaxColor } from './useSyntaxColor';
-export { useInverseColor } from './useInverseColor';
 export { ThemedText } from './ThemedText';
 export { ThemedBox } from './ThemedBox';
 export { Dialog } from './Dialog';
