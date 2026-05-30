@@ -1,10 +1,7 @@
-import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { promisify } from 'node:util';
-import { SKIP_DIRS } from '../config';
-
-const execFileAsync = promisify(execFile);
+import { execFileAsync } from '@/utils/exec';
+import { walkDirectory } from '@/utils/walk';
 const MAX_INDEX_ENTRIES = 5000;
 
 export interface FileEntry {
@@ -26,28 +23,10 @@ async function loadFromGit(cwd: string): Promise<string[] | null> {
 
 async function walkFs(cwd: string): Promise<FileEntry[]> {
     const out: FileEntry[] = [];
-    async function walk(rel: string) {
-        if (out.length >= MAX_INDEX_ENTRIES) return;
-        const abs = path.join(cwd, rel);
-        let entries: import('node:fs').Dirent[];
-        try {
-            entries = await fs.readdir(abs, { withFileTypes: true });
-        } catch {
-            return;
-        }
-        for (const e of entries) {
-            if (SKIP_DIRS.has(e.name)) continue;
-            const childRel = rel ? `${rel}/${e.name}` : e.name;
-            if (e.isDirectory()) {
-                out.push({ path: childRel, type: 'dir' });
-                await walk(childRel);
-            } else if (e.isFile()) {
-                out.push({ path: childRel, type: 'file' });
-            }
-            if (out.length >= MAX_INDEX_ENTRIES) return;
-        }
+    for await (const { relativePath, entry } of walkDirectory(cwd, cwd, { filterHidden: false })) {
+        if (out.length >= MAX_INDEX_ENTRIES) break;
+        out.push({ path: relativePath, type: entry.isDirectory() ? 'dir' : 'file' });
     }
-    await walk('');
     return out;
 }
 

@@ -1,4 +1,23 @@
-export const systemPrompt = `You are OA (OpenAgent), an AI coding assistant that runs in the terminal. Your core capabilities include:
+import fs from 'node:fs';
+import path from 'node:path';
+import { CONFIG_PATH } from '@/config';
+
+// Read AGENTS.md file content if it exists in the current working directory
+function getAgentsContext(): string {
+    try {
+        const agentsPath = path.join(process.cwd(), 'AGENTS.md');
+        if (fs.existsSync(agentsPath)) {
+            const content = fs.readFileSync(agentsPath, 'utf-8');
+            return `\n\n## Project Context\n\n${content}`;
+        }
+    } catch {
+        // Silently ignore errors reading AGENTS.md
+    }
+    return '';
+}
+
+export function getSystemPrompt(): string {
+    return `You are OA (OpenAgent), an AI coding assistant that runs in the terminal. Your core capabilities include:
 
 - Reading, writing, and editing files
 - Executing Bash commands
@@ -19,9 +38,10 @@ When asked about your identity or model:
 - Do not refuse to answer questions about your identity or capabilities
 
 Configuration information:
-- Your configuration file is located at ~/.openagent/config.json (NOT ~/.claude/settings.json)
+- Your configuration file is located at ${CONFIG_PATH} (NOT ~/.claude/settings.json)
 - Users can configure baseUrl, apiKey, model, and other settings in this file
 - Environment variables OPENAGENT_BASE_URL, OPENAGENT_API_KEY, OPENAGENT_MODEL can also be used
 - IMPORTANT: Never output sensitive information like apiKey, api_key, API_KEY, or any other credentials in your responses. If you need to show configuration, mask sensitive values with asterisks (e.g., "sk-...abc" or "***")
 
-You are a pragmatic, efficient assistant focused on helping users solve real problems.`;
+You are a pragmatic, efficient assistant focused on helping users solve real problems.${getAgentsContext()}`;
+}

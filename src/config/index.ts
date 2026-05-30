@@ -1,12 +1,19 @@
-import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { getErrorMessage } from '@/utils/errors';
+import { readJsonFile, writeJsonFile } from '@/utils/fs';
 
 export const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.next', 'coverage', '.cache', 'out']);
 
 export const APP_NAME = 'Open Agent';
 
-const CONFIG_PATH = path.join(os.homedir(), '.openagent', 'config.json');
+/** 获取 ~/.openagent 目录路径 */
+export function getOpenAgentDir(): string {
+    return path.join(os.homedir(), '.openagent');
+}
+
+export const CONFIG_PATH = path.join(getOpenAgentDir(), 'config.json');
+export const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 const DEFAULT_MAX_STEPS = 20;
 
 interface OpenAgentConfig {
@@ -40,23 +47,19 @@ function readConfig(): OpenAgentConfig {
     const envConfig = readEnvConfig();
     const hasRequiredEnv = envConfig.baseUrl && envConfig.apiKey && envConfig.model;
 
-    if (!fs.existsSync(CONFIG_PATH)) {
+    const fileConfig = readJsonFile<OpenAgentConfig>(CONFIG_PATH);
+    if (!fileConfig) {
         if (hasRequiredEnv) {
             cachedConfig = envConfig;
             return cachedConfig;
         }
         // 自动创建默认配置文件
-        const dir = path.dirname(CONFIG_PATH);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-        fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 4), 'utf-8');
+        writeJsonFile(CONFIG_PATH, DEFAULT_CONFIG);
         cachedConfig = { ...DEFAULT_CONFIG };
         return cachedConfig;
     }
 
     try {
-        const fileConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) as OpenAgentConfig;
         cachedConfig = { ...fileConfig, ...Object.fromEntries(Object.entries(envConfig).filter(([, value]) => value !== undefined && value !== '')) };
         return cachedConfig;
     } catch (error) {
@@ -64,8 +67,7 @@ function readConfig(): OpenAgentConfig {
             cachedConfig = envConfig;
             return cachedConfig;
         }
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`读取配置文件失败：${CONFIG_PATH}\n${message}`);
+        throw new Error(`读取配置文件失败：${CONFIG_PATH}\n${getErrorMessage(error)}`);
     }
 }
 
@@ -118,11 +120,7 @@ export function getConfigSummary(): { baseUrl: string; model: string; maxSteps: 
 export function saveConfig(updates: Partial<OpenAgentConfig>): void {
     const current = readConfig();
     const merged = { ...current, ...updates };
-    const dir = path.dirname(CONFIG_PATH);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 4), 'utf-8');
+    writeJsonFile(CONFIG_PATH, merged);
     cachedConfig = merged;
 }
 

@@ -1,6 +1,7 @@
 import { tool } from 'ai';
 import axios from 'axios';
 import { z } from 'zod';
+import { getErrorMessage } from '@/utils/errors';
 
 interface SearchResult {
     title: string;
@@ -130,7 +131,7 @@ export const webSearchTool = tool({
                 provider: result.provider
             };
         } catch (error) {
-            throw new Error(`Search failed: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(`Search failed: ${getErrorMessage(error)}`);
         }
     }
 });

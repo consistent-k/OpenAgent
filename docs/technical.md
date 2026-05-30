@@ -78,17 +78,19 @@ OpenAgent/
 │   │   │   └── index.ts             # Skill 工具加载
 │   │   └── tools/                   # 10 个内置工具
 │   │       ├── index.ts             # 工具注册表
-│   │       ├── shared.ts            # 共享逻辑（writeFileContent）
-│   │       ├── askUserQuestion.ts   # ask_user_question
-│   │       ├── editFile.ts          # edit_file
-│   │       ├── executeBash.ts       # execute_bash
-│   │       ├── fetch.ts             # fetch
-│   │       ├── glob.ts              # glob
-│   │       ├── grep.ts              # grep
-│   │       ├── readDirectory.ts     # read_directory
-│   │       ├── readFile.ts          # read_file
-│   │       ├── webSearch.ts         # web_search
-│   │       └── writeFile.ts         # write_file
+│   │       ├── utils/               # 工具共享逻辑
+│   │       │   ├── approval-store.ts # 工具审批偏好持久化
+│   │       │   └── write-file.ts    # 文件写入共享函数
+│   │       ├── askUserQuestion/     # ask_user_question
+│   │       ├── bash/                # execute_bash
+│   │       ├── editFile/            # edit_file
+│   │       ├── fetch/               # fetch
+│   │       ├── glob/                # glob
+│   │       ├── grep/                # grep
+│   │       ├── readDirectory/       # read_directory
+│   │       ├── readFile/            # read_file
+│   │       ├── webSearch/           # web_search
+│   │       └── writeFile/           # write_file
 │   ├── commands/                    # 11 个斜杠命令
 │   │   ├── registry.ts              # SlashCommand 接口 + CommandContext
 │   │   ├── index.ts                 # 命令注册表 + 解析
@@ -144,13 +146,17 @@ OpenAgent/
 │   │       ├── ListItem.tsx         # 可选中列表项
 │   │       └── KeyboardShortcutHint.tsx
 │   └── utils/                       # 工具函数
+│       ├── errors.ts                # 错误信息提取
+│       ├── exec.ts                  # 共享 execFileAsync
 │       ├── files.ts                 # 文件索引 + @mention 解析
+│       ├── fs.ts                    # 文件系统工具（ensureDir, readJson, writeJson）
 │       ├── highlight.ts             # 正则语法高亮
 │       ├── markdown.ts              # Markdown 检测 + 词法分析
 │       ├── safe-path.ts             # 路径安全沙箱
 │       ├── sessions.ts              # 会话持久化
 │       ├── summarize-args.ts        # 参数摘要
-│       └── uid.ts                   # UUID 生成
+│       ├── uid.ts                   # UUID 生成
+│       └── walk.ts                  # 目录遍历（walkDirectory）
 ├── tsconfig.json                    # TypeScript 配置
 ├── eslint.config.mjs                # ESLint 配置
 ├── commitlint.config.mjs            # 提交规范
@@ -332,8 +338,14 @@ getConfigSummary()            // 获取配置摘要（API Key 脱敏：前4位..
 ### 6.5 全局常量
 
 - `APP_NAME = 'Open Agent'` — 应用名称
+- `CONFIG_PATH` — 配置文件完整路径（`~/.openagent/config.json`）
+- `MAX_FILE_SIZE = 1024 * 1024` — 文件读取和 grep 的大小上限（1MB）
 - `DEFAULT_MAX_STEPS = 20` — 默认最大步数
 - `SKIP_DIRS` — 文件索引和 grep/glob 时跳过的目录：`node_modules`, `.git`, `dist`, `.next`, `.coverage`, `.cache`, `out`
+
+### 6.6 目录工具函数
+
+`getOpenAgentDir()` 返回 `~/.openagent` 目录路径，所有读写该目录的代码统一使用此函数。
 
 ---
 
@@ -371,6 +383,8 @@ export async function runAgent(messages: ModelMessage[], abortSignal?: AbortSign
 const result = streamText({
     model: getProvider()(getModelName()),
     stopWhen: stepCountIs(getMaxSteps()),
+    system: getSystemPrompt(),
+    messages,
     tools: { skill, ...tools },
     abortSignal
 });
@@ -378,8 +392,15 @@ const result = streamText({
 
 - **model**: 通过 provider 和配置的模型名创建
 - **stopWhen**: 最多执行 `maxSteps` 步
+- **system**: 系统提示词（每次调用时动态生成），包含基础提示和项目上下文（从 AGENTS.md 文件读取）
+- **messages**: 对话历史
 - **tools**: skill 工具 + 10 个内置工具
 - **abortSignal**: 支持用户取消
+
+系统提示词由 `system-prompt.ts` 的 `getSystemPrompt()` 函数动态生成，每次 `streamText` 调用时执行，包含两部分：
+
+1. **基础提示**：描述 OA 的身份、能力和工作方式
+2. **项目上下文**：从当前工作目录的 `AGENTS.md` 文件读取（如果存在），提供项目特定的指导信息
 
 ### 7.4 Skill 系统
 
@@ -973,6 +994,60 @@ lexMarkdown(text: string): Token[]
 import { randomUUID } from 'node:crypto';
 export const uid = randomUUID;
 ```
+
+### 13.8 errors.ts — 错误信息提取
+
+```typescript
+// 从 unknown 错误中提取可读的错误信息
+getErrorMessage(error: unknown): string
+```
+
+统一处理 `catch (error)` 中 error 类型不确定的场景，替代重复的 `error instanceof Error ? error.message : String(error)`。
+
+### 13.9 exec.ts — 共享命令执行
+
+```typescript
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+export const execFileAsync = promisify(execFile);
+```
+
+`files.ts` 和 `sessions.ts` 共用的 `execFile` promisify 封装。
+
+### 13.10 fs.ts — 文件系统工具
+
+```typescript
+// 确保目录存在（同步/异步）
+ensureDirSync(dir: string): void
+ensureDir(dir: string): Promise<void>
+
+// 读取 JSON 文件，不存在或解析失败时返回 null
+readJsonFile<T>(filePath: string): T | null
+
+// 写入 JSON 文件，自动创建父目录
+writeJsonFile(filePath: string, data: unknown, indent?: number): void
+```
+
+`config/index.ts` 和 `approval-store.ts` 的文件读写统一使用这些函数。
+
+### 13.11 walk.ts — 目录遍历
+
+```typescript
+interface WalkEntry {
+    relativePath: string;  // 相对于基准目录的路径
+    fullPath: string;      // 绝对路径
+    entry: Dirent;         // fs.Dirent 对象
+}
+
+// 异步目录遍历生成器
+walkDirectory(dir, baseDir, options?): AsyncGenerator<WalkEntry>
+```
+
+统一 `grep`、`glob`、`files.ts` 的目录遍历逻辑：
+
+- 自动过滤 `SKIP_DIRS` 和隐藏文件（`filterHidden` 可配置）
+- 通过 `shouldRecurse` 控制是否递归子目录
+- yield 所有条目（文件和目录），调用方按需过滤
 
 ---
 

@@ -1,8 +1,8 @@
-import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { getOpenAgentDir } from '@/config';
+import { readJsonFile, writeJsonFile } from '@/utils/fs';
 
-const APPROVALS_PATH = path.join(os.homedir(), '.openagent', 'approvals.json');
+const APPROVALS_PATH = path.join(getOpenAgentDir(), 'approvals.json');
 
 export const APPROVABLE_TOOLS = ['execute_bash', 'write_file', 'edit_file'] as const;
 
@@ -18,27 +18,12 @@ let cached: ApprovalPreferences | null = null;
 
 function readPreferences(): ApprovalPreferences {
     if (cached) return cached;
-
-    if (!fs.existsSync(APPROVALS_PATH)) {
-        cached = {};
-        return cached;
-    }
-
-    try {
-        cached = JSON.parse(fs.readFileSync(APPROVALS_PATH, 'utf-8')) as ApprovalPreferences;
-        return cached;
-    } catch {
-        cached = {};
-        return cached;
-    }
+    cached = readJsonFile<ApprovalPreferences>(APPROVALS_PATH) ?? {};
+    return cached;
 }
 
 function writePreferences(prefs: ApprovalPreferences): void {
-    const dir = path.dirname(APPROVALS_PATH);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(APPROVALS_PATH, JSON.stringify(prefs, null, 4), 'utf-8');
+    writeJsonFile(APPROVALS_PATH, prefs);
     cached = prefs;
 }
 

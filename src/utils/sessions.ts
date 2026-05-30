@@ -1,12 +1,10 @@
-import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
-import { promisify } from 'node:util';
 import type { ModelMessage, UIMessage } from 'ai';
+import { getOpenAgentDir } from '@/config';
+import { execFileAsync } from '@/utils/exec';
 
-const execFileAsync = promisify(execFile);
 const SESSION_VERSION = 1;
 
 let cachedBranch: string | null = null;
@@ -62,7 +60,7 @@ async function sessionDir(cwd: string): Promise<string> {
     const projectName = sanitizeName(path.basename(path.resolve(cwd)));
     const branch = sanitizeName(await getBranch());
     const hash = cwdHash(cwd);
-    const base = path.join(os.homedir(), '.openagent', 'sessions');
+    const base = path.join(getOpenAgentDir(), 'sessions');
     const newDir = path.join(base, `${projectName}-${hash}+${branch}`);
 
     // Migrate old directory format (projectName+branch → projectName-hash+branch)

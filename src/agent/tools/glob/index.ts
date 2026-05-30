@@ -1,9 +1,8 @@
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { SKIP_DIRS } from '../../../config';
 import { ROOT_DIR, resolveSafePath } from '@/utils/safe-path';
+import { walkDirectory } from '@/utils/walk';
 
 const MAX_MATCHES = 200;
 
@@ -68,27 +67,14 @@ export const globTool = tool({
         const regex = globToRegex(pattern);
         const results: string[] = [];
 
-        async function walkDir(dir: string): Promise<void> {
-            if (results.length >= MAX_MATCHES) return;
-            const entries = await fs.readdir(dir, { withFileTypes: true });
-            for (const entry of entries) {
-                if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
-                const entryPath = path.join(dir, entry.name);
-                // Use lstat to avoid following symlinks
-                const lstat = await fs.lstat(entryPath);
-                if (lstat.isDirectory()) {
-                    await walkDir(entryPath);
-                } else if (lstat.isFile()) {
-                    const relativePath = toPosixPath(path.relative(rootDir, entryPath));
-                    if (regex.test(relativePath)) {
-                        results.push(relativePath);
-                        if (results.length >= MAX_MATCHES) return;
-                    }
-                }
+        for await (const { relativePath, entry } of walkDirectory(rootDir, rootDir)) {
+            if (!entry.isFile()) continue;
+            const posixPath = toPosixPath(relativePath);
+            if (regex.test(posixPath)) {
+                results.push(posixPath);
+                if (results.length >= MAX_MATCHES) break;
             }
         }
-
-        await walkDir(rootDir);
 
         return {
             pattern,

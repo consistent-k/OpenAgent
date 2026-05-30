@@ -1,12 +1,12 @@
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { SKIP_DIRS } from '../../../config';
+import { MAX_FILE_SIZE } from '@/config';
+import { getErrorMessage } from '@/utils/errors';
 import { resolveSafePath, ROOT_DIR } from '@/utils/safe-path';
+import { walkDirectory } from '@/utils/walk';
 
 const DEFAULT_MAX_MATCHES = 200;
-const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 
 /** Simple glob matching, supports * and ? */
 function matchesGlob(filename: string, pattern: string): boolean {
@@ -86,7 +86,7 @@ export const grepTool = tool({
         try {
             regex = new RegExp(pattern, flags);
         } catch (error) {
-            throw new Error(`Invalid regex pattern: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(`Invalid regex pattern: ${getErrorMessage(error)}`);
         }
 
         async function loadLines(filePath: string): Promise<string[] | null> {
@@ -114,34 +114,24 @@ export const grepTool = tool({
         async function searchDirectory(dir: string): Promise<FileMatchResult[]> {
             const results: FileMatchResult[] = [];
             let totalLines = 0;
-            const entries = await fs.readdir(dir, { withFileTypes: true });
 
-            for (const entry of entries) {
-                if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
+            for await (const { relativePath, fullPath, entry } of walkDirectory(dir, ROOT_DIR, {
+                shouldRecurse: () => recursive
+            })) {
+                if (!entry.isFile()) continue;
                 if (glob && !matchesGlob(entry.name, glob)) continue;
 
-                const entryPath = path.join(dir, entry.name);
-                const relPath = path.relative(ROOT_DIR, entryPath);
-
-                if (entry.isFile()) {
-                    const result = await searchSingleFile(entryPath, relPath);
-                    if (result) {
-                        results.push(result);
-                        totalLines += result.matches.length;
-                        if (totalLines >= maxMatches) {
-                            // Truncate excess matches from the last file
-                            const excess = totalLines - maxMatches;
-                            if (excess > 0) {
-                                result.matches = result.matches.slice(0, result.matches.length - excess);
-                            }
-                            return results;
+                const result = await searchSingleFile(fullPath, relativePath);
+                if (result) {
+                    results.push(result);
+                    totalLines += result.matches.length;
+                    if (totalLines >= maxMatches) {
+                        const excess = totalLines - maxMatches;
+                        if (excess > 0) {
+                            result.matches = result.matches.slice(0, result.matches.length - excess);
                         }
+                        return results;
                     }
-                } else if (entry.isDirectory() && recursive) {
-                    const sub = await searchDirectory(entryPath);
-                    results.push(...sub);
-                    totalLines = results.reduce((sum, r) => sum + r.matches.length, 0);
-                    if (totalLines >= maxMatches) return results;
                 }
             }
 

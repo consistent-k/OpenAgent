@@ -1,9 +1,8 @@
 import fs from 'node:fs/promises';
 import { tool } from 'ai';
 import { z } from 'zod';
+import { MAX_FILE_SIZE } from '@/config';
 import { resolveSafePath } from '@/utils/safe-path';
-
-const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 
 export const readFileTool = tool({
     description:

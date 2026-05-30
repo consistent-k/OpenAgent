@@ -3,6 +3,7 @@ import net from 'node:net';
 import { tool } from 'ai';
 import axios from 'axios';
 import { z } from 'zod';
+import { getErrorMessage } from '@/utils/errors';
 
 function isPrivateIPv4(address: string): boolean {
     const parts = address.split('.').map(Number);
@@ -118,7 +119,7 @@ export const fetchTool = tool({
             if (axios.isAxiosError(error)) {
                 throw new Error(`Failed to fetch URL: ${error.message}`);
             }
-            throw new Error(`Failed to fetch URL: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(`Failed to fetch URL: ${getErrorMessage(error)}`);
         }
     }
 });
