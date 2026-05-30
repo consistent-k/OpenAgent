@@ -13,11 +13,14 @@ interface FileMentionInputProps {
     onSubmit: (v: string) => void;
     fileIndex: FileEntry[];
     swallowRef: React.MutableRefObject<string | null>;
+    selectedIndex?: number;
+    onSelectedIndexChange?: (index: number) => void;
 }
 
-export function FileMentionInput({ value, onChange, onSubmit, fileIndex, swallowRef }: FileMentionInputProps) {
-    const [selectedIndex, setSelectedIndex] = useState(0);
-    const [resetKey, setResetKey] = useState(0);
+export function FileMentionInput({ value, onChange, onSubmit, fileIndex, swallowRef, selectedIndex: externalSelectedIndex, onSelectedIndexChange }: FileMentionInputProps) {
+    const [internalSelectedIndex, setInternalSelectedIndex] = useState(0);
+    const selectedIndex = externalSelectedIndex ?? internalSelectedIndex;
+    const setSelectedIndex = onSelectedIndexChange ?? setInternalSelectedIndex;
 
     const activeMention = useMemo(() => getActiveMention(value), [value]);
     const fileMatches = useMemo<FileEntry[]>(() => {
@@ -45,17 +48,9 @@ export function FileMentionInput({ value, onChange, onSubmit, fileIndex, swallow
     useInput((_input, key) => {
         if (!activeMention || fileMatches.length === 0) return;
         if (key.upArrow) {
-            setSelectedIndex((i) => Math.max(0, i - 1));
+            setSelectedIndex(Math.max(0, selectedIndex - 1));
         } else if (key.downArrow) {
-            setSelectedIndex((i) => Math.min(fileMatches.length - 1, i + 1));
-        } else if (key.tab || key.return) {
-            const target = fileMatches[selectedIndex];
-            if (target && activeMention) {
-                const before = value.slice(0, activeMention.start);
-                const insert = `@${target.path}${target.type === 'dir' ? '/' : ''} `;
-                onChange(before + insert);
-                setResetKey((k) => k + 1);
-            }
+            setSelectedIndex(Math.min(fileMatches.length - 1, selectedIndex + 1));
         }
     });
 
@@ -71,7 +66,7 @@ export function FileMentionInput({ value, onChange, onSubmit, fileIndex, swallow
         <Box flexDirection="column">
             <ThemedBox borderColor="border" paddingX={1}>
                 <ThemedText color="accent">{'> '}</ThemedText>
-                <TextInput key={resetKey} value={value} onChange={handleChange} onSubmit={handleSubmit} />
+                <TextInput value={value} onChange={handleChange} onSubmit={handleSubmit} />
             </ThemedBox>
             <Divider color="border" />
             {activeMention && <FilePicker entries={fileMatches} selectedIndex={selectedIndex} query={activeMention.query} />}

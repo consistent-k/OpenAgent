@@ -12,11 +12,14 @@ interface CommandInputProps {
     onChange: (v: string) => void;
     onSubmit: (v: string, highlightedCommand?: string) => void;
     swallowRef: React.MutableRefObject<string | null>;
+    selectedIndex?: number;
+    onSelectedIndexChange?: (index: number) => void;
 }
 
-export function CommandInput({ value, onChange, onSubmit, swallowRef }: CommandInputProps) {
-    const [selectedIndex, setSelectedIndex] = useState(0);
-    const [resetKey, setResetKey] = useState(0);
+export function CommandInput({ value, onChange, onSubmit, swallowRef, selectedIndex: externalSelectedIndex, onSelectedIndexChange }: CommandInputProps) {
+    const [internalSelectedIndex, setInternalSelectedIndex] = useState(0);
+    const selectedIndex = externalSelectedIndex ?? internalSelectedIndex;
+    const setSelectedIndex = onSelectedIndexChange ?? setInternalSelectedIndex;
 
     const filtered = useMemo<SlashCommand[]>(() => {
         if (value === '/') return COMMANDS;
@@ -43,15 +46,9 @@ export function CommandInput({ value, onChange, onSubmit, swallowRef }: CommandI
     useInput((_input, key) => {
         if (filtered.length === 0) return;
         if (key.upArrow) {
-            setSelectedIndex((i) => Math.max(0, i - 1));
+            setSelectedIndex(Math.max(0, selectedIndex - 1));
         } else if (key.downArrow) {
-            setSelectedIndex((i) => Math.min(filtered.length - 1, i + 1));
-        } else if (key.tab) {
-            const target = filtered[selectedIndex];
-            if (target && target.name !== value) {
-                onChange(target.name);
-                setResetKey((k) => k + 1);
-            }
+            setSelectedIndex(Math.min(filtered.length - 1, selectedIndex + 1));
         }
     });
 
@@ -67,7 +64,7 @@ export function CommandInput({ value, onChange, onSubmit, swallowRef }: CommandI
         <Box flexDirection="column">
             <ThemedBox borderColor="border" paddingX={1}>
                 <ThemedText color="accent">{'> '}</ThemedText>
-                <TextInput key={resetKey} value={value} onChange={handleChange} onSubmit={handleSubmit} />
+                <TextInput value={value} onChange={handleChange} onSubmit={handleSubmit} />
             </ThemedBox>
             <Divider color="border" />
             <CommandPalette commands={filtered} selectedIndex={selectedIndex} />

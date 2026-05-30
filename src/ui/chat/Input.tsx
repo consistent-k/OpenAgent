@@ -1,48 +1,41 @@
-import { Box, useInput } from 'ink';
+import { Box } from 'ink';
 import TextInput from 'ink-text-input';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { COMMANDS, type SlashCommand } from '../../commands';
 import type { PendingToolApproval } from '../../hooks/useChatStream';
-import { getActiveMention, type FileEntry } from '../../utils/files';
+import { getActiveMention, filterFiles, type FileEntry } from '../../utils/files';
 import type { SessionSummary } from '../../utils/sessions';
 import { Divider } from '../text/Divider';
 import type { ThemeName } from '../text/theme';
 import { ThemedBox } from '../text/ThemedBox';
 import { ThemedText } from '../text/ThemedText';
-import { ApprovalDialog } from './ApprovalDialog';
 import { CommandInput } from './CommandInput';
+import { type ConfigItem } from './ConfigPicker';
 import { FileMentionInput } from './FileMentionInput';
-import { SessionPicker } from './SessionPicker';
-import { ThemePicker } from './ThemePicker';
+import { OverlaySlot } from './OverlaySlot';
+import { useInputMode } from './useInputMode';
 
 interface InputProps {
+    // Text input (4)
     value: string;
     onChange: (v: string) => void;
     onSubmit: (v: string, highlightedCommand?: string) => void;
     disabled: boolean;
+    // File index (1)
     fileIndex: FileEntry[];
+    // Approval (4)
     pendingApproval: PendingToolApproval | null;
     onApprove: () => void;
     onDeny: (reason?: string) => void;
     onSelectOption: (optionText: string) => void;
+    // Picker triggers + callbacks (6)
     sessionPicker: SessionSummary[] | null;
     onSelectSession: (name: string) => void;
-    onCancelSession: () => void;
-    currentThemeName: ThemeName;
-    themePickerOpen: boolean;
+    themePicker: ThemeName | null;
     onSelectTheme: (name: ThemeName) => void;
-    onCancelTheme: () => void;
-}
-
-type InputMode = 'approval' | 'session' | 'theme' | 'disabled' | 'command' | 'file' | 'text';
-
-function getMode(value: string, disabled: boolean, pendingApproval: PendingToolApproval | null, sessionPicker: SessionSummary[] | null, themePickerOpen: boolean): InputMode {
-    if (pendingApproval) return 'approval';
-    if (sessionPicker) return 'session';
-    if (themePickerOpen) return 'theme';
-    if (disabled) return 'disabled';
-    if (value.startsWith('/') && !/\s/.test(value)) return 'command';
-    if (getActiveMention(value)) return 'file';
-    return 'text';
+    configPicker: ConfigItem[] | null;
+    onSaveConfig: (key: string, value: string) => void;
+    onCancelPicker: () => void;
 }
 
 export function Input({
@@ -57,52 +50,92 @@ export function Input({
     onSelectOption,
     sessionPicker,
     onSelectSession,
-    onCancelSession,
-    currentThemeName,
-    themePickerOpen,
+    themePicker,
     onSelectTheme,
-    onCancelTheme
+    configPicker,
+    onSaveConfig,
+    onCancelPicker
 }: InputProps) {
-    const swallowChar = useRef<string | null>(null);
-    const [inputResetKey, setInputResetKey] = useState(0);
-    const prevModeRef = useRef<InputMode>('text');
+    // Command filtering
+    const [commandIndex, setCommandIndex] = useState(0);
+    const filteredCommands = useMemo<SlashCommand[]>(() => {
+        if (value === '/') return COMMANDS;
+        if (value.startsWith('/') && !/\s/.test(value)) return COMMANDS.filter((c) => c.name.startsWith(value));
+        return [];
+    }, [value]);
 
-    const mode = getMode(value, disabled, pendingApproval, sessionPicker, themePickerOpen);
+    // File mention filtering
+    const [fileSelectedIndex, setFileSelectedIndex] = useState(0);
+    const activeMention = useMemo(() => getActiveMention(value), [value]);
+    const fileMatches = useMemo<FileEntry[]>(() => {
+        if (!activeMention) return [];
+        return filterFiles(fileIndex, activeMention.query);
+    }, [activeMention, fileIndex]);
+
+    // Mode state machine
+    const { mode, overlayType, resetKey, swallowRef } = useInputMode({
+        value,
+        disabled,
+        pendingApproval,
+        sessionPicker,
+        themePicker,
+        configPicker,
+        filteredCommands,
+        fileMatches,
+        commandIndex,
+        fileIndex: fileSelectedIndex,
+        onCommandSelect: useCallback(
+            (name: string) => {
+                onChange(name);
+                setCommandIndex(0);
+            },
+            [onChange]
+        ),
+        onFileSelect: useCallback(
+            (insert: string) => {
+                const mention = getActiveMention(value);
+                if (mention) {
+                    const before = value.slice(0, mention.start);
+                    onChange(before + insert);
+                }
+                setFileSelectedIndex(0);
+            },
+            [onChange, value]
+        ),
+        onCancelPicker
+    });
+
+    // Reset selection indices when query changes
+    useEffect(() => {
+        setCommandIndex(0);
+    }, [value]);
 
     useEffect(() => {
-        const prev = prevModeRef.current;
-        if (prev !== 'text' && mode === 'text') {
-            setInputResetKey((k) => k + 1);
-        }
-        prevModeRef.current = mode;
-    }, [mode]);
+        setFileSelectedIndex(0);
+    }, [activeMention?.query]);
 
-    useInput(
-        (_input, key) => {
-            if (key.ctrl && (_input === 'r' || _input === 'o')) {
-                swallowChar.current = _input;
-            }
-        },
-        { isActive: !disabled && !pendingApproval }
-    );
-
-    // Mode 1: Approval dialog
-    if (pendingApproval) {
-        return <ApprovalDialog pending={pendingApproval} onApprove={onApprove} onDeny={onDeny} onSelectOption={onSelectOption} />;
+    // Overlay mode: render overlay exclusively
+    if (overlayType) {
+        return (
+            <OverlaySlot
+                overlayType={overlayType}
+                pendingApproval={pendingApproval}
+                onApprove={onApprove}
+                onDeny={onDeny}
+                onSelectOption={onSelectOption}
+                sessionPicker={sessionPicker}
+                onSelectSession={onSelectSession}
+                themePicker={themePicker}
+                onSelectTheme={onSelectTheme}
+                configPicker={configPicker}
+                onSaveConfig={onSaveConfig}
+                onCancelPicker={onCancelPicker}
+            />
+        );
     }
 
-    // Mode 1b: Session picker
-    if (sessionPicker) {
-        return <SessionPicker sessions={sessionPicker} onSelect={onSelectSession} onCancel={onCancelSession} />;
-    }
-
-    // Mode 1c: Theme picker
-    if (themePickerOpen) {
-        return <ThemePicker current={currentThemeName} onSelect={onSelectTheme} onCancel={onCancelTheme} />;
-    }
-
-    // Mode 2: Disabled (AI is responding)
-    if (disabled) {
+    // Disabled mode
+    if (mode === 'disabled') {
         return (
             <Box flexDirection="column">
                 <ThemedBox borderColor="border" paddingX={1}>
@@ -114,26 +147,34 @@ export function Input({
         );
     }
 
-    // Mode 3: Slash command palette
-    const showPalette = value.startsWith('/') && !/\s/.test(value);
-    if (showPalette) {
-        return <CommandInput value={value} onChange={onChange} onSubmit={onSubmit} swallowRef={swallowChar} />;
+    // Command mode
+    if (mode === 'command') {
+        return <CommandInput value={value} onChange={onChange} onSubmit={onSubmit} swallowRef={swallowRef} selectedIndex={commandIndex} onSelectedIndexChange={setCommandIndex} />;
     }
 
-    // Mode 4: File mention
-    const activeMention = getActiveMention(value);
-    if (activeMention) {
-        return <FileMentionInput value={value} onChange={onChange} onSubmit={(v) => onSubmit(v)} fileIndex={fileIndex} swallowRef={swallowChar} />;
+    // File mention mode
+    if (mode === 'file') {
+        return (
+            <FileMentionInput
+                value={value}
+                onChange={onChange}
+                onSubmit={(v) => onSubmit(v)}
+                fileIndex={fileIndex}
+                swallowRef={swallowRef}
+                selectedIndex={fileSelectedIndex}
+                onSelectedIndexChange={setFileSelectedIndex}
+            />
+        );
     }
 
-    // Mode 5: Normal text input
+    // Normal text mode
     const handleChange = (v: string) => {
-        const c = swallowChar.current;
+        const c = swallowRef.current;
         if (c && v === value + c) {
-            swallowChar.current = null;
+            swallowRef.current = null;
             return;
         }
-        swallowChar.current = null;
+        swallowRef.current = null;
         onChange(v);
     };
 
@@ -141,7 +182,7 @@ export function Input({
         <Box flexDirection="column">
             <ThemedBox borderColor="border" paddingX={1}>
                 <ThemedText color="accent">{'> '}</ThemedText>
-                <TextInput key={inputResetKey} value={value} onChange={handleChange} onSubmit={(v) => onSubmit(v)} />
+                <TextInput key={resetKey} value={value} onChange={handleChange} onSubmit={(v) => onSubmit(v)} />
             </ThemedBox>
             <Divider color="border" />
         </Box>

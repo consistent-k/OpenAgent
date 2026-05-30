@@ -1,8 +1,10 @@
 import { Box, useApp, useInput } from 'ink';
 import React, { useCallback, useState } from 'react';
 import { findCommand, COMMANDS, parseCommandInput } from './commands';
+import { getConfigSummary, saveConfig, reloadConfig, type OpenAgentConfig } from './config';
 import { useChatStream } from './hooks/useChatStream';
 import { useFileIndex } from './hooks/useFileIndex';
+import type { ConfigItem } from './ui/chat/ConfigPicker';
 import { Input } from './ui/chat/Input';
 import { MessageList } from './ui/messages/MessageList';
 import { PartRenderer } from './ui/messages/PartRenderer';
@@ -37,6 +39,54 @@ function AppContent() {
     const [showToolDetails, setShowToolDetails] = useState(false);
     const [sessionPicker, setSessionPicker] = useState<SessionSummary[] | null>(null);
     const [themePickerOpen, setThemePickerOpen] = useState(false);
+    const [configPickerOpen, setConfigPickerOpen] = useState(false);
+
+    const getConfigItems = useCallback((): ConfigItem[] => {
+        const config = getConfigSummary();
+        return [
+            { key: 'baseUrl', label: 'Base URL', value: config.baseUrl, editable: true },
+            { key: 'apiKey', label: 'API Key', value: config.apiKey, editable: true },
+            { key: 'model', label: 'Model', value: config.model, editable: true },
+            { key: 'maxSteps', label: 'Max Steps', value: String(config.maxSteps), editable: true }
+        ];
+    }, []);
+
+    const [configItems, setConfigItems] = useState<ConfigItem[]>([]);
+
+    const handleSaveConfig = useCallback(
+        (key: string, value: string) => {
+            const updates: Partial<OpenAgentConfig> = {};
+            if (key === 'maxSteps') {
+                updates.maxSteps = Number(value);
+            } else {
+                (updates as Record<string, string>)[key] = value;
+            }
+            try {
+                saveConfig(updates);
+                reloadConfig();
+                setConfigItems(getConfigItems());
+                setConfigPickerOpen(false);
+                setInputValue('');
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: `/config` }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `已更新配置 ${key}：${key === 'apiKey' ? '****' : value}`, state: 'done' }] }
+                ]);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: `/config` }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `保存配置失败：${message}`, state: 'done' }] }
+                ]);
+            }
+        },
+        [getConfigItems, appendMessages]
+    );
+
+    const handleCancelPicker = useCallback(() => {
+        setSessionPicker(null);
+        setThemePickerOpen(false);
+        setConfigPickerOpen(false);
+    }, []);
 
     const lastIdx = displayMessages.length - 1;
     const lastMessage = lastIdx >= 0 ? displayMessages[lastIdx] : null;
@@ -68,10 +118,6 @@ function AppContent() {
         [cwd, setSession, saveCurrentSession]
     );
 
-    const handleCancelSession = useCallback(() => {
-        setSessionPicker(null);
-    }, []);
-
     const handleSelectTheme = useCallback(
         (name: ThemeName) => {
             setThemeName(name);
@@ -84,10 +130,6 @@ function AppContent() {
         },
         [setThemeName, appendMessages]
     );
-
-    const handleCancelTheme = useCallback(() => {
-        setThemePickerOpen(false);
-    }, []);
 
     useInput((input, key) => {
         if (key.ctrl && input === 'r') {
@@ -138,7 +180,11 @@ function AppContent() {
                         showSessionPicker: setSessionPicker,
                         themeName,
                         setThemeName: (name) => setThemeName(name),
-                        showThemePicker: () => setThemePickerOpen(true)
+                        showThemePicker: () => setThemePickerOpen(true),
+                        showConfigPicker: () => {
+                            setConfigItems(getConfigItems());
+                            setConfigPickerOpen(true);
+                        }
                     });
                 } catch (error) {
                     const message = error instanceof Error ? error.message : String(error);
@@ -169,7 +215,8 @@ function AppContent() {
             saveCurrentSession,
             setSessionPicker,
             themeName,
-            setThemeName
+            setThemeName,
+            getConfigItems
         ]
     );
 
@@ -198,11 +245,11 @@ function AppContent() {
                 onSelectOption={selectQuestionOption}
                 sessionPicker={sessionPicker}
                 onSelectSession={handleSelectSession}
-                onCancelSession={handleCancelSession}
-                currentThemeName={themeName}
-                themePickerOpen={themePickerOpen}
+                themePicker={themePickerOpen ? themeName : null}
                 onSelectTheme={handleSelectTheme}
-                onCancelTheme={handleCancelTheme}
+                configPicker={configPickerOpen ? configItems : null}
+                onSaveConfig={handleSaveConfig}
+                onCancelPicker={handleCancelPicker}
             />
             <StatusBar cwd={cwd} modelId={modelId} usage={usage} />
         </Box>

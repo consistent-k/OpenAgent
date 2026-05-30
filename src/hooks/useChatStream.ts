@@ -269,6 +269,30 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
                         );
                         break;
                     }
+                    case 'tool-input-error': {
+                        setDisplayMessages((prev) =>
+                            updateLastAssistant(prev, (parts) => {
+                                const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === chunk.toolCallId);
+                                if (idx === -1) return parts;
+                                const existing = parts[idx] as DynamicToolUIPart;
+                                const existingApproval = (existing as DynamicToolUIPart & { approval?: { id: string } }).approval;
+                                const updated = {
+                                    type: 'dynamic-tool' as const,
+                                    toolName: existing.toolName,
+                                    toolCallId: existing.toolCallId,
+                                    state: 'output-error' as const,
+                                    input: existing.input,
+                                    errorText: chunk.errorText,
+                                    title: existing.title,
+                                    toolMetadata: existing.toolMetadata,
+                                    providerExecuted: existing.providerExecuted,
+                                    ...(existingApproval ? { approval: { ...existingApproval, approved: true as const } } : {})
+                                } as DynamicToolUIPart;
+                                return [...parts.slice(0, idx), updated, ...parts.slice(idx + 1)];
+                            })
+                        );
+                        break;
+                    }
                     case 'tool-output-error': {
                         setDisplayMessages((prev) =>
                             updateLastAssistant(prev, (parts) => {

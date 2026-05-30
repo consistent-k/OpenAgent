@@ -94,3 +94,21 @@ export function getConfigSummary(): { baseUrl: string; model: string; maxSteps: 
         apiKey: maskedApiKey
     };
 }
+
+export function saveConfig(updates: Partial<OpenAgentConfig>): void {
+    const current = readConfig();
+    const merged = { ...current, ...updates };
+    const dir = path.dirname(CONFIG_PATH);
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 4), 'utf-8');
+    cachedConfig = merged;
+}
+
+export function reloadConfig(): OpenAgentConfig {
+    cachedConfig = null;
+    return readConfig();
+}
+
+export type { OpenAgentConfig };
