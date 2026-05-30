@@ -66,19 +66,31 @@ src/
 │   ├── runAgent.ts        # 调用 AI SDK streamText 的核心逻辑
 │   ├── skill/
 │   │   └── index.ts       # Skill 系统入口
-│   └── tools/             # AI 工具（每个文件导出一个 tool({...})）
+│   └── tools/             # AI 工具（每个工具一个文件夹，导出 tool({...})）
 │       ├── index.ts       # 工具注册表
-│       ├── shared.ts      # 工具共享逻辑
-│       ├── askUserQuestion.ts
-│       ├── editFile.ts
-│       ├── executeBash.ts
-│       ├── fetch.ts
-│       ├── glob.ts
-│       ├── grep.ts
-│       ├── readDirectory.ts
-│       ├── readFile.ts
-│       ├── webSearch.ts
-│       └── writeFile.ts
+│       ├── utils/         # 工具共享逻辑
+│       │   ├── approval-store.ts  # 工具审批偏好持久化
+│       │   └── write-file.ts      # 文件写入共享函数
+│       ├── askUserQuestion/
+│       │   └── index.ts
+│       ├── bash/
+│       │   └── index.ts
+│       ├── editFile/
+│       │   └── index.ts
+│       ├── fetch/
+│       │   └── index.ts
+│       ├── glob/
+│       │   └── index.ts
+│       ├── grep/
+│       │   └── index.ts
+│       ├── readDirectory/
+│       │   └── index.ts
+│       ├── readFile/
+│       │   └── index.ts
+│       ├── webSearch/
+│       │   └── index.ts
+│       └── writeFile/
+│           └── index.ts
 ├── ui/                    # Ink UI 组件
 │   ├── index.ts
 │   ├── chat/              # 聊天交互组件

@@ -16,6 +16,13 @@ interface OpenAgentConfig {
     maxSteps?: number;
 }
 
+const DEFAULT_CONFIG: OpenAgentConfig = {
+    baseUrl: '',
+    apiKey: '',
+    model: '',
+    maxSteps: 5
+};
+
 let cachedConfig: OpenAgentConfig | null = null;
 
 function readEnvConfig(): OpenAgentConfig {
@@ -38,7 +45,14 @@ function readConfig(): OpenAgentConfig {
             cachedConfig = envConfig;
             return cachedConfig;
         }
-        throw new Error(`缺少配置文件 ${CONFIG_PATH}，请先创建并填入 baseUrl、apiKey、model，或设置 OPENAGENT_BASE_URL、OPENAGENT_API_KEY、OPENAGENT_MODEL`);
+        // 自动创建默认配置文件
+        const dir = path.dirname(CONFIG_PATH);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, 4), 'utf-8');
+        cachedConfig = { ...DEFAULT_CONFIG };
+        return cachedConfig;
     }
 
     try {
@@ -55,24 +69,30 @@ function readConfig(): OpenAgentConfig {
     }
 }
 
-function getRequiredConfigValue(key: 'baseUrl' | 'apiKey' | 'model'): string {
-    const value = readConfig()[key];
-    if (!value || value.trim().length === 0) {
-        throw new Error(`配置文件 ${CONFIG_PATH} 缺少字段 ${key}`);
+/** 检查必填配置项（baseUrl / apiKey / model）是否都已填写 */
+export function isConfigReady(): boolean {
+    try {
+        const config = readConfig();
+        return !!(config.baseUrl?.trim() && config.apiKey?.trim() && config.model?.trim());
+    } catch {
+        return false;
     }
-    return value;
+}
+
+function getConfigValue(key: 'baseUrl' | 'apiKey' | 'model'): string {
+    return readConfig()[key]?.trim() ?? '';
 }
 
 export function getApiKey(): string {
-    return getRequiredConfigValue('apiKey');
+    return getConfigValue('apiKey');
 }
 
 export function getBaseUrl(): string {
-    return getRequiredConfigValue('baseUrl');
+    return getConfigValue('baseUrl');
 }
 
 export function getModelName(): string {
-    return getRequiredConfigValue('model');
+    return getConfigValue('model');
 }
 
 export function getMaxSteps(): number {
@@ -86,7 +106,7 @@ export function getMaxSteps(): number {
 
 export function getConfigSummary(): { baseUrl: string; model: string; maxSteps: number; apiKey: string } {
     const apiKey = getApiKey();
-    const maskedApiKey = apiKey.length <= 8 ? '****' : `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}`;
+    const maskedApiKey = apiKey ? (apiKey.length <= 8 ? '****' : `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}`) : '';
     return {
         baseUrl: getBaseUrl(),
         model: getModelName(),

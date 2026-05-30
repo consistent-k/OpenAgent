@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import { tool } from 'ai';
 import { z } from 'zod';
+import { isToolApproved } from '../utils/approval-store';
 import { resolveSafePath } from '@/utils/safe-path';
 
 export const editFileTool = tool({
@@ -11,7 +12,7 @@ export const editFileTool = tool({
         '- By default, `old_string` must be unique in the file. Use `replace_all` to replace every occurrence.\n' +
         '- Prefer this tool over write_file for modifying existing files — it only sends the diff.\n' +
         '- Use `replace_all` for replacing and renaming strings across the file (e.g., renaming a variable).',
-    needsApproval: true,
+    needsApproval: () => !isToolApproved('edit_file'),
     inputSchema: z.object({
         path: z.string().describe('Relative file path within the working directory.'),
         old_string: z.string().describe('The exact text to find and replace. Must match the file content exactly, including indentation and line breaks.'),

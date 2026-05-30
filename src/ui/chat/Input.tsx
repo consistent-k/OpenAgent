@@ -23,9 +23,10 @@ interface InputProps {
     disabled: boolean;
     // File index (1)
     fileIndex: FileEntry[];
-    // Approval (4)
+    // Approval (5)
     pendingApproval: PendingToolApproval | null;
     onApprove: () => void;
+    onAlwaysApprove: () => void;
     onDeny: (reason?: string) => void;
     onSelectOption: (optionText: string) => void;
     // Picker triggers + callbacks (6)
@@ -46,6 +47,7 @@ export function Input({
     fileIndex,
     pendingApproval,
     onApprove,
+    onAlwaysApprove,
     onDeny,
     onSelectOption,
     sessionPicker,
@@ -121,6 +123,7 @@ export function Input({
                 overlayType={overlayType}
                 pendingApproval={pendingApproval}
                 onApprove={onApprove}
+                onAlwaysApprove={onAlwaysApprove}
                 onDeny={onDeny}
                 onSelectOption={onSelectOption}
                 sessionPicker={sessionPicker}

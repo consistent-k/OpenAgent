@@ -2,6 +2,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { tool } from 'ai';
 import { z } from 'zod';
+import { isToolApproved } from '../utils/approval-store';
 import { ROOT_DIR } from '@/utils/safe-path';
 
 const execAsync = promisify(exec);
@@ -126,7 +127,10 @@ export const executeBashTool = tool({
         '- Edit files: Use edit_file (NOT sed/awk)\n' +
         '- Write files: Use write_file (NOT echo/cat)\n\n' +
         'Supports pipes |, chaining &&/||, and output redirection >/>>/2>/2>>. Dangerous operations (rm -rf, sudo, mkfs, etc.) are blocked.',
-    needsApproval: ({ command }) => !isReadonlyCommand(command),
+    needsApproval: ({ command }) => {
+        if (isToolApproved('execute_bash')) return false;
+        return !isReadonlyCommand(command);
+    },
     inputSchema: z.object({
         command: z
             .string()

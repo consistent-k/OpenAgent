@@ -14,6 +14,7 @@ interface OverlaySlotProps {
     // Approval
     pendingApproval: PendingToolApproval | null;
     onApprove: () => void;
+    onAlwaysApprove: () => void;
     onDeny: (reason?: string) => void;
     onSelectOption: (optionText: string) => void;
     // Session picker
@@ -33,6 +34,7 @@ export function OverlaySlot({
     overlayType,
     pendingApproval,
     onApprove,
+    onAlwaysApprove,
     onDeny,
     onSelectOption,
     sessionPicker,
@@ -44,7 +46,7 @@ export function OverlaySlot({
     onCancelPicker
 }: OverlaySlotProps) {
     if (overlayType === 'approval' && pendingApproval) {
-        return <ApprovalDialog pending={pendingApproval} onApprove={onApprove} onDeny={onDeny} onSelectOption={onSelectOption} />;
+        return <ApprovalDialog pending={pendingApproval} onApprove={onApprove} onAlwaysApprove={onAlwaysApprove} onDeny={onDeny} onSelectOption={onSelectOption} />;
     }
 
     if (overlayType === 'session' && sessionPicker) {

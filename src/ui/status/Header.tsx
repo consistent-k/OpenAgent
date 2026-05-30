@@ -44,11 +44,7 @@ function fileIndexText(status: FileIndexStatus, count: number): { text: string; 
 }
 
 function safeModelName(): string {
-    try {
-        return getModelName();
-    } catch {
-        return '未配置';
-    }
+    return getModelName() || '未配置';
 }
 
 export function Header({ status, fileIndexStatus, fileIndexCount, pendingApproval }: HeaderProps) {

@@ -1,11 +1,15 @@
-import { useInput } from 'ink';
+import { Box, Text, useInput } from 'ink';
+import TextInput from 'ink-text-input';
 import React, { useEffect, useState } from 'react';
 import type { PendingToolApproval } from '../../hooks/useChatStream';
 import { summarizeArgs } from '../../utils/summarize-args';
 import { Dialog } from '../text/Dialog';
 import { ListItem } from '../text/ListItem';
+import { Pane } from '../text/Pane';
 
-const APPROVAL_OPTIONS = ['批准执行', '拒绝'] as const;
+const APPROVAL_OPTIONS = ['批准执行', '始终批准此类操作', '拒绝'] as const;
+
+const CUSTOM_INPUT_LABEL = '✏️ 自定义输入...';
 
 function isAskUserQuestion(pending: PendingToolApproval): boolean {
     return pending.toolName === 'ask_user_question';
@@ -27,25 +31,40 @@ function extractQuestionText(input: unknown): string {
 interface ApprovalDialogProps {
     pending: PendingToolApproval;
     onApprove: () => void;
+    onAlwaysApprove: () => void;
     onDeny: (reason?: string) => void;
     onSelectOption: (optionText: string) => void;
 }
 
-export function ApprovalDialog({ pending, onApprove, onDeny, onSelectOption }: ApprovalDialogProps) {
+export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, onSelectOption }: ApprovalDialogProps) {
     const [index, setIndex] = useState(0);
+    const [customInputMode, setCustomInputMode] = useState(false);
+    const [customText, setCustomText] = useState('');
 
     const isQuestion = isAskUserQuestion(pending);
     const questionOptions = isQuestion ? extractQuestionOptions(pending.input) : [];
     const questionText = isQuestion ? extractQuestionText(pending.input) : '';
 
+    // All selectable items: options + custom input entry
+    const allItems = isQuestion ? [...questionOptions, CUSTOM_INPUT_LABEL] : [];
+
     useEffect(() => {
         setIndex(0);
+        setCustomInputMode(false);
+        setCustomText('');
     }, [pending]);
 
-    const maxIndex = isQuestion ? questionOptions.length - 1 : APPROVAL_OPTIONS.length - 1;
+    const maxIndex = isQuestion ? allItems.length - 1 : APPROVAL_OPTIONS.length - 1;
 
     useInput(
         (_input, key) => {
+            if (customInputMode) {
+                if (key.escape) {
+                    setCustomInputMode(false);
+                    setCustomText('');
+                }
+                return;
+            }
             if (key.upArrow) {
                 setIndex((i) => Math.max(0, i - 1));
             } else if (key.downArrow) {
@@ -55,25 +74,67 @@ export function ApprovalDialog({ pending, onApprove, onDeny, onSelectOption }: A
         { isActive: true }
     );
 
+    // ask_user_question with custom input mode
+    if (isQuestion && customInputMode) {
+        return (
+            <Pane color="suggestion">
+                <Box flexDirection="column" gap={1}>
+                    <Box flexDirection="column">
+                        <Text bold color="suggestion">
+                            {questionText || `${pending.toolName}(${summarizeArgs(pending.input)})`}
+                        </Text>
+                        <Text dimColor>输入自定义回答，Enter 确认</Text>
+                    </Box>
+                    <Box>
+                        <Text color="suggestion">{'❯ '}</Text>
+                        <TextInput value={customText} onChange={setCustomText} onSubmit={(v) => onSelectOption(v || customText)} />
+                    </Box>
+                    <Box marginTop={1}>
+                        <Text dimColor italic>
+                            Enter 确认 · Esc 返回
+                        </Text>
+                    </Box>
+                </Box>
+            </Pane>
+        );
+    }
+
+    // ask_user_question with option list
     if (isQuestion && questionOptions.length > 0) {
         return (
             <Dialog
                 title={questionText || `${pending.toolName}(${summarizeArgs(pending.input)})`}
                 subtitle="↑/↓ 选择，Enter 确认"
-                onConfirm={() => onSelectOption(questionOptions[index]!)}
+                onConfirm={() => {
+                    if (index < questionOptions.length) {
+                        onSelectOption(questionOptions[index]!);
+                    } else {
+                        setCustomInputMode(true);
+                    }
+                }}
                 onCancel={() => onDeny('用户未选择')}
             >
-                {questionOptions.map((label, i) => (
-                    <ListItem isFocused={i === index} key={label}>
-                        {label}
+                {allItems.map((label, i) => (
+                    <ListItem isFocused={i === index} key={i}>
+                        {i < questionOptions.length ? `${i + 1}. ${label}` : label}
                     </ListItem>
                 ))}
             </Dialog>
         );
     }
 
+    // Standard approval dialog (not ask_user_question)
     return (
-        <Dialog title={`${pending.toolName}(${summarizeArgs(pending.input)})`} subtitle="↑/↓ 选择，Enter 确认" onConfirm={() => (index === 0 ? onApprove() : onDeny())} onCancel={() => onDeny()}>
+        <Dialog
+            title={`${pending.toolName}(${summarizeArgs(pending.input)})`}
+            subtitle="↑/↓ 选择，Enter 确认"
+            onConfirm={() => {
+                if (index === 0) onApprove();
+                else if (index === 1) onAlwaysApprove();
+                else onDeny();
+            }}
+            onCancel={() => onDeny()}
+        >
             {APPROVAL_OPTIONS.map((label, i) => (
                 <ListItem isFocused={i === index} key={label}>
                     {label}

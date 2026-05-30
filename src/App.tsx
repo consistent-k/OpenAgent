@@ -1,7 +1,7 @@
 import { Box, useApp, useInput } from 'ink';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { findCommand, COMMANDS, parseCommandInput } from './commands';
-import { getConfigSummary, saveConfig, reloadConfig, type OpenAgentConfig } from './config';
+import { getConfigSummary, saveConfig, reloadConfig, isConfigReady, type OpenAgentConfig } from './config';
 import { useChatStream } from './hooks/useChatStream';
 import { useFileIndex } from './hooks/useFileIndex';
 import type { ConfigItem } from './ui/chat/ConfigPicker';
@@ -28,11 +28,26 @@ function AppContent() {
     const { themeName, setThemeName } = useTheme();
     const cwd = process.cwd();
     const { fileIndex, status: fileIndexStatus, reload: reloadFileIndex } = useFileIndex(cwd);
-    const { messages, displayMessages, status, usage, modelId, pendingApproval, send, approvePendingTool, denyPendingTool, selectQuestionOption, appendMessages, setSession, reset, cancel } =
-        useChatStream({
-            fileIndex,
-            cwd
-        });
+    const {
+        messages,
+        displayMessages,
+        status,
+        usage,
+        modelId,
+        pendingApproval,
+        send,
+        approvePendingTool,
+        alwaysApprovePendingTool,
+        denyPendingTool,
+        selectQuestionOption,
+        appendMessages,
+        setSession,
+        reset,
+        cancel
+    } = useChatStream({
+        fileIndex,
+        cwd
+    });
 
     const [inputValue, setInputValue] = useState('');
     const [showReasoning, setShowReasoning] = useState(false);
@@ -40,6 +55,36 @@ function AppContent() {
     const [sessionPicker, setSessionPicker] = useState<SessionSummary[] | null>(null);
     const [themePickerOpen, setThemePickerOpen] = useState(false);
     const [configPickerOpen, setConfigPickerOpen] = useState(false);
+
+    // 启动时检查配置，未完善则引导用户
+    const configChecked = useRef(false);
+    useEffect(() => {
+        if (configChecked.current) return;
+        configChecked.current = true;
+        if (!isConfigReady()) {
+            appendMessages([
+                {
+                    id: uid(),
+                    role: 'assistant',
+                    parts: [
+                        {
+                            type: 'text',
+                            text: [
+                                '👋 欢迎使用 Open Agent！检测到配置文件尚未完善，请先配置以下必填项：',
+                                '',
+                                '  • baseUrl — API 服务地址',
+                                '  • apiKey  — API 密钥',
+                                '  • model   — 模型名称',
+                                '',
+                                '输入 /config 打开配置编辑器，或手动编辑 ~/.openagent/config.json'
+                            ].join('\n'),
+                            state: 'done'
+                        }
+                    ]
+                }
+            ]);
+        }
+    }, [appendMessages]);
 
     const getConfigItems = useCallback((): ConfigItem[] => {
         const config = getConfigSummary();
@@ -241,6 +286,7 @@ function AppContent() {
                 fileIndex={fileIndex}
                 pendingApproval={pendingApproval}
                 onApprove={approvePendingTool}
+                onAlwaysApprove={alwaysApprovePendingTool}
                 onDeny={denyPendingTool}
                 onSelectOption={selectQuestionOption}
                 sessionPicker={sessionPicker}

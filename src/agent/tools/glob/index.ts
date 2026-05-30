@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { SKIP_DIRS } from '../../config';
+import { SKIP_DIRS } from '../../../config';
 import { ROOT_DIR, resolveSafePath } from '@/utils/safe-path';
 
 const MAX_MATCHES = 200;

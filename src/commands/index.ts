@@ -1,3 +1,4 @@
+import { approvalsCommand } from './approvals';
 import { cancelCommand } from './cancel';
 import { clearCommand } from './clear';
 import { configCommand } from './config';
@@ -11,7 +12,20 @@ import { statusCommand } from './status';
 import { themeCommand } from './theme';
 import { toolsCommand } from './tools';
 
-export const COMMANDS: SlashCommand[] = [helpCommand, statusCommand, configCommand, themeCommand, toolsCommand, reloadCommand, cancelCommand, loadCommand, sessionsCommand, clearCommand, exitCommand];
+export const COMMANDS: SlashCommand[] = [
+    helpCommand,
+    statusCommand,
+    configCommand,
+    approvalsCommand,
+    themeCommand,
+    toolsCommand,
+    reloadCommand,
+    cancelCommand,
+    loadCommand,
+    sessionsCommand,
+    clearCommand,
+    exitCommand
+];
 
 export function parseCommandInput(input: string): { name: string; args: string[] } {
     const [name = '', ...args] = input.trim().split(/\s+/).filter(Boolean);

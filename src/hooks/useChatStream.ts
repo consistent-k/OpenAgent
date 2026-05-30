@@ -2,7 +2,8 @@ import type { ModelMessage } from 'ai';
 import type { UIMessage, TextUIPart, ReasoningUIPart, DynamicToolUIPart, FileUIPart } from 'ai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { runAgent } from '../agent';
-import { getModelName } from '../config';
+import { setToolApproval } from '../agent/tools/utils/approval-store';
+import { getModelName, isConfigReady } from '../config';
 import { expandMentions, type FileEntry } from '../utils/files';
 import { uid } from '../utils/uid';
 
@@ -30,6 +31,7 @@ interface UseChatStreamResult {
     pendingApproval: PendingToolApproval | null;
     send: (text: string) => Promise<void>;
     approvePendingTool: () => Promise<void>;
+    alwaysApprovePendingTool: () => Promise<void>;
     denyPendingTool: (reason?: string) => Promise<void>;
     selectQuestionOption: (optionText: string) => Promise<void>;
     appendMessages: (items: UIMessage[]) => void;
@@ -414,6 +416,14 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
 
     const send = useCallback(
         async (text: string) => {
+            if (!isConfigReady()) {
+                setDisplayMessages((prev) => [
+                    ...prev,
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text' as const, text: '⚠️ 配置未完善，请先输入 /config 配置 baseUrl、apiKey、model', state: 'done' as const }] }
+                ]);
+                return;
+            }
             setDisplayMessages((prev) => [...prev, { id: uid(), role: 'user', parts: [{ type: 'text', text }] }, { id: uid(), role: 'assistant', parts: [] }]);
             const expandedText = await expandMentions(text, fileIndex, cwd);
             const nonSystem = messagesRef.current.filter((m) => m.role !== 'system');
@@ -428,6 +438,43 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
 
     const approvePendingTool = useCallback(async () => {
         if (!pendingApproval) return;
+        const approvalMessage = {
+            role: 'tool',
+            content: [
+                {
+                    type: 'tool-approval-response',
+                    approvalId: pendingApproval.approvalId,
+                    approved: true
+                }
+            ]
+        } as ModelMessage;
+        const nextMessages = [...messagesRef.current, approvalMessage];
+        messagesRef.current = nextMessages;
+        setMessages(nextMessages);
+        setPendingApproval(null);
+        setDisplayMessages((prev) =>
+            updateLastAssistant(prev, (parts) => {
+                const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === pendingApproval.toolCallId);
+                if (idx === -1) return parts;
+                const existing = parts[idx] as DynamicToolUIPart;
+                return [
+                    ...parts.slice(0, idx),
+                    {
+                        ...existing,
+                        state: 'approval-responded' as const,
+                        approval: { id: pendingApproval.approvalId, approved: true as const }
+                    } as DynamicToolUIPart,
+                    ...parts.slice(idx + 1)
+                ];
+            })
+        );
+        setDisplayMessages((prev) => [...prev, { id: uid(), role: 'assistant', parts: [] }]);
+        await streamMessages(nextMessages);
+    }, [pendingApproval, streamMessages]);
+
+    const alwaysApprovePendingTool = useCallback(async () => {
+        if (!pendingApproval) return;
+        setToolApproval(pendingApproval.toolName, true);
         const approvalMessage = {
             role: 'tool',
             content: [
@@ -563,6 +610,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
         pendingApproval,
         send,
         approvePendingTool,
+        alwaysApprovePendingTool,
         denyPendingTool,
         selectQuestionOption,
         appendMessages,
