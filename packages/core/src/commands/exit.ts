@@ -1,3 +1,4 @@
+import { channelManager } from '@oagent/channels';
 import type { SlashCommand } from './registry';
 
 export const exitCommand: SlashCommand = {
@@ -5,6 +6,12 @@ export const exitCommand: SlashCommand = {
     description: '退出 TUI',
     run: async ({ saveCurrentSession, exit }) => {
         await saveCurrentSession();
+        // 停止所有 channel，释放连接，否则进程无法退出
+        try {
+            await channelManager.stopAll();
+        } catch {
+            // ignore
+        }
         exit();
     }
 };

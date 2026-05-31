@@ -5,7 +5,8 @@ import { CONFIG_PATH } from '@/config';
 // Read AGENTS.md file content if it exists in the current working directory
 function getAgentsContext(): string {
     try {
-        const agentsPath = path.join(process.cwd(), 'AGENTS.md');
+        const workDir = process.env.OPENAGENT_WORK_DIR || process.cwd();
+        const agentsPath = path.join(workDir, 'AGENTS.md');
         if (fs.existsSync(agentsPath)) {
             const content = fs.readFileSync(agentsPath, 'utf-8');
             return `\n\n## Project Context\n\n${content}`;

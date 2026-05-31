@@ -1,5 +1,6 @@
 import { approvalsCommand } from './approvals';
 import { cancelCommand } from './cancel';
+import { channelCommand } from './channel';
 import { clearCommand } from './clear';
 import { configCommand } from './config';
 import { exitCommand } from './exit';
@@ -19,6 +20,7 @@ export const COMMANDS: SlashCommand[] = [
     approvalsCommand,
     themeCommand,
     toolsCommand,
+    channelCommand,
     reloadCommand,
     cancelCommand,
     loadCommand,

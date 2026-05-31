@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const ROOT_DIR = path.resolve(process.cwd());
+/** 支持通过环境变量覆盖工作目录（用于微信机器人等子进程场景） */
+export const ROOT_DIR = path.resolve(process.env.OPENAGENT_WORK_DIR || process.cwd());
 
 export function resolveSafePath(relPath: string): string {
     const resolved = path.resolve(ROOT_DIR, relPath);

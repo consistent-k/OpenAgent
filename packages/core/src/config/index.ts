@@ -21,6 +21,8 @@ interface OpenAgentConfig {
     apiKey?: string;
     model?: string;
     maxSteps?: number;
+    /** 启用的 channel 插件包名列表，如 ["@oagent/weixin"] */
+    channels?: string[];
 }
 
 const DEFAULT_CONFIG: OpenAgentConfig = {
@@ -104,6 +106,11 @@ export function getMaxSteps(): number {
         throw new Error(`配置字段 maxSteps 必须是 1 到 20 之间的整数`);
     }
     return value;
+}
+
+/** 获取配置的 channel 插件列表 */
+export function getConfiguredChannels(): string[] {
+    return readConfig().channels ?? [];
 }
 
 export function getConfigSummary(): { baseUrl: string; model: string; maxSteps: number; apiKey: string } {

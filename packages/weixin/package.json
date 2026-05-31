@@ -1,0 +1,37 @@
+{
+    "name": "@oagent/weixin",
+    "version": "1.0.0",
+    "description": "WeChat channel plugin for OpenAgent",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "clean": "rm -rf dist",
+        "build": "tsup",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@oagent/channels": "workspace:*",
+        "axios": "^1.16.1",
+        "qrcode-terminal": "0.12.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.3",
+        "ai": "^6.0.0",
+        "tsup": "^8.5.1",
+        "typescript": "^6.0.0"
+    },
+    "engines": {
+        "node": ">=22"
+    }
+}

@@ -11,6 +11,7 @@
 - 会话管理：自动保存历史会话，随时恢复上下文继续对话
 - 流式响应：实时展示 AI 的思考过程和工具调用细节
 - Skill 系统：从 `~/.agents/skills` 目录加载自定义 Skill，扩展 Agent 的能力
+- Channel 插件：通过插件系统接入微信等消息平台，实现远程控制
 
 ## 启动与安装
 
@@ -164,6 +165,77 @@ export const fooCommand: SlashCommand = {
 ## 添加新工具
 
 在 `src/agent/tools/` 下新建文件，导出 `tool({...})`，再到 `tools/index.ts` 注册。
+
+## Channel 插件系统
+
+OA 支持通过插件接入消息平台（微信、Telegram 等），实现远程与 AI 对话。
+
+### 安装插件
+
+```bash
+# 在使用 OA 的项目目录下安装
+pnpm add @oagent/weixin
+```
+
+### 启用插件
+
+在 `~/.openagent/config.json` 中配置 `channels` 字段：
+
+```json
+{
+    "baseUrl": "https://api.example.com/v1",
+    "apiKey": "sk-...",
+    "model": "gpt-4.1",
+    "channels": ["@oagent/weixin"]
+}
+```
+
+### 使用
+
+```
+/channel                  # 查看所有 channel 状态
+/channel start weixin     # 启动微信机器人
+/channel stop weixin      # 停止微信机器人
+```
+
+启动后，微信收到的消息会实时显示在 TUI 中，AI 的回复也会同步发送到微信。
+
+### 开发自定义插件
+
+创建一个 npm 包，导出 `register` 函数：
+
+```typescript
+import type { ChannelManager } from '@oagent/channels';
+
+export function register(manager: ChannelManager, opts: { runAgent: RunAgentFn }): void {
+    manager.register(new MyChannel(opts));
+}
+```
+
+实现 `Channel` 接口：
+
+```typescript
+import type { Channel, ChannelStartOpts, ChannelStatus } from '@oagent/channels';
+
+export class MyChannel implements Channel {
+    readonly id = 'my-channel';
+    readonly name = 'My Channel';
+    status: ChannelStatus = 'idle';
+
+    isConfigured(): boolean {
+        /* ... */
+    }
+    getStatusInfo(): string[] {
+        /* ... */
+    }
+    async start(opts: ChannelStartOpts): Promise<void> {
+        /* ... */
+    }
+    async stop(): Promise<void> {
+        /* ... */
+    }
+}
+```
 
 ## 技术文档
 

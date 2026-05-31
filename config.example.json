@@ -2,5 +2,6 @@
     "baseUrl": "",
     "apiKey": "",
     "model": "",
-    "maxSteps": 5
+    "maxSteps": 5,
+    "channels": []
 }

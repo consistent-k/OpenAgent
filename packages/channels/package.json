@@ -1,0 +1,45 @@
+{
+    "name": "@oagent/channels",
+    "version": "1.0.0",
+    "description": "Channel abstraction layer for OpenAgent",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./types": {
+            "types": "./dist/types.d.ts",
+            "default": "./dist/types.js"
+        },
+        "./manager": {
+            "types": "./dist/manager.d.ts",
+            "default": "./dist/manager.js"
+        },
+        "./session": {
+            "types": "./dist/session.d.ts",
+            "default": "./dist/session.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "clean": "rm -rf dist",
+        "build": "tsup",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "ai": "^6.0.0"
+    },
+    "devDependencies": {
+        "tsup": "^8.5.1",
+        "typescript": "^6.0.0"
+    },
+    "engines": {
+        "node": ">=22"
+    }
+}
