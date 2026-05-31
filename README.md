@@ -13,103 +13,33 @@
 - Skill 系统：从 `~/.agents/skills` 目录加载自定义 Skill，扩展 Agent 的能力
 - Channel 插件：通过插件系统接入微信等消息平台，实现远程控制
 
-## 启动与安装
+## 快速开始（安装版）
 
 ```bash
-# 1. 安装依赖
-pnpm install
+# 全局安装
+pnpm add -g @oagent/oa
+# 或
+npm install -g @oagent/oa
 
-# 2. 配置模型参数
-mkdir -p ~/.openagent
-cp config.example.json ~/.openagent/config.json
-# 然后编辑 ~/.openagent/config.json，填入 baseUrl、apiKey、model
-# maxSteps 可选，默认 20，用于限制单次回复的工具调用步数（1~20）
-
-# 3. 运行
-pnpm start
-# 或开发模式（文件变更自动重启）
-pnpm dev
-```
-
-## 编译
-
-```bash
-pnpm build
-```
-
-编译产物会输出到 `dist/index.js`，并带有 `#!/usr/bin/env node`，可以作为命令行程序执行。
-
-## 在其他目录使用
-
-开发时可以用本地链接安装 `oa`：
-
-```bash
-pnpm build
-pnpm link --global
-
+# 在项目目录中启动（首次运行会自动进入配置向导）
 cd /path/to/your/project
 oa
 ```
 
-`oa` 会以你执行命令时的目录作为工作目录，文件索引、读取、写入和命令执行都会限制在该目录下。模型配置默认读取用户全局配置文件：`~/.openagent/config.json`。
-
-### 项目上下文
-
-在项目根目录创建 `AGENTS.md` 文件，可以在启动时自动加载到系统提示词中，为 AI 提供项目特定的指导信息。例如：
-
-```markdown
-# 项目指南
-
-这是一个 React 项目，使用 TypeScript 和 Vite。
-
-## 编码规范
-
-- 使用函数组件和 Hooks
-- 使用 TypeScript 严格模式
-- 遵循 ESLint 规则
-```
-
-AI 会读取这些信息，更好地理解项目结构和开发规范。
-
-也可以用环境变量临时覆盖配置：
+也可以使用环境变量临时覆盖配置（跳过配置向导）：
 
 ```bash
 OPENAGENT_BASE_URL="https://api.example.com/v1" \
 OPENAGENT_API_KEY="sk-..." \
 OPENAGENT_MODEL="gpt-4.1" \
-OPENAGENT_MAX_STEPS="5" \
 oa
 ```
 
-## 质量检查
+> `oa` 会以当前目录为工作目录，文件读写、命令执行等操作都会限制在该目录下。首次运行或配置缺失时会自动打开配置向导，引导你填入 `baseUrl`、`apiKey`、`model` 等参数，保存到 `~/.openagent/config.json`。
 
-```bash
-pnpm lint
-pnpm typecheck
-pnpm format
-```
+## 开发
 
-## 项目结构
-
-```
-src/
-├── index.tsx           # 入口
-├── App.tsx             # 主组件（编排聊天流、命令处理、会话保存）
-├── config/             # 配置管理（baseUrl、apiKey、model、maxSteps）
-├── hooks/              # useChatStream / useFileIndex
-├── commands/           # 斜杠命令（registry 模式，每个命令一个文件）
-├── agent/
-│   ├── provider.ts     # AI SDK provider 配置
-│   ├── runAgent.ts     # 调用 AI SDK streamText 的核心逻辑
-│   ├── skill/          # Skill 系统
-│   └── tools/          # AI 工具（单文件单工具）
-├── ui/                 # Ink UI 组件
-│   ├── chat/           # 聊天交互（输入框、命令面板、确认对话框、文件选择器等）
-│   ├── messages/       # 消息渲染（文本、工具调用、推理过程、文件内容）
-│   ├── status/         # 状态栏（Header、StatusBar 等）
-│   └── text/           # 文本 & 主题基础组件（Markdown、ThemedBox、Spinner 等）
-└── utils/              # 工具函数（文件索引、@mention 解析、会话持久化等）
-```
+参见 [docs/development.md](docs/development.md)，包含开发环境搭建、编译、项目结构、扩展指南等内容。
 
 ## 快捷键
 
@@ -129,42 +59,19 @@ src/
 
 - `/help`：查看所有可用命令
 - `/status`：查看当前工作目录和文件索引状态
-- `/config`：查看当前模型配置摘要（隐藏 API Key）
+- `/config`：打开配置选择器，编辑配置文件
+- `/approvals`：管理工具审批偏好（execute_bash/write_file/edit_file）
 - `/tools`：列出 Agent 可调用的内置工具
 - `/theme`：切换主题
+- `/channel`：管理消息渠道（start/stop/login/logout/status）
 - `/reload`：刷新 `@文件` 补全索引
 - `/cancel`：停止当前正在流式生成的回复
 - `/load [名称]`：恢复已保存会话
 - `/sessions`：列出当前工作目录已保存的会话
 - `/clear`：保存当前会话并开始新会话
-- `/exit`：退出
+- `/exit`：保存会话、停止所有渠道、退出
 
 > 每次 `/clear` 时自动保存当前会话到 `~/.openagent/sessions/{项目名}+{分支}/` 目录下，以 JSON 格式存储。
-
-## 添加新命令
-
-在 `src/commands/` 下新建一个文件：
-
-```ts
-import type { SlashCommand } from './registry';
-
-export const fooCommand: SlashCommand = {
-    name: '/foo',
-    description: '示例命令',
-    run: ({ appendItems, rawInput }) => {
-        appendItems([
-            { kind: 'user', text: rawInput },
-            { kind: 'assistant', text: 'hello from /foo', streaming: false }
-        ]);
-    }
-};
-```
-
-然后在 `src/commands/index.ts` 的 `COMMANDS` 数组里加入。
-
-## 添加新工具
-
-在 `src/agent/tools/` 下新建文件，导出 `tool({...})`，再到 `tools/index.ts` 注册。
 
 ## Channel 插件系统
 
@@ -200,42 +107,7 @@ pnpm add @oagent/weixin
 
 启动后，微信收到的消息会实时显示在 TUI 中，AI 的回复也会同步发送到微信。
 
-### 开发自定义插件
-
-创建一个 npm 包，导出 `register` 函数：
-
-```typescript
-import type { ChannelManager } from '@oagent/channels';
-
-export function register(manager: ChannelManager, opts: { runAgent: RunAgentFn }): void {
-    manager.register(new MyChannel(opts));
-}
-```
-
-实现 `Channel` 接口：
-
-```typescript
-import type { Channel, ChannelStartOpts, ChannelStatus } from '@oagent/channels';
-
-export class MyChannel implements Channel {
-    readonly id = 'my-channel';
-    readonly name = 'My Channel';
-    status: ChannelStatus = 'idle';
-
-    isConfigured(): boolean {
-        /* ... */
-    }
-    getStatusInfo(): string[] {
-        /* ... */
-    }
-    async start(opts: ChannelStartOpts): Promise<void> {
-        /* ... */
-    }
-    async stop(): Promise<void> {
-        /* ... */
-    }
-}
-```
+> 开发自定义插件请参阅 [docs/development.md](docs/development.md)。
 
 ## 技术文档
 

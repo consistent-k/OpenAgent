@@ -1,6 +1,6 @@
 {
     "name": "@oagent/channels",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Channel abstraction layer for OpenAgent",
     "type": "module",
     "main": "./dist/index.js",
@@ -33,7 +33,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "ai": "^6.0.0"
+        "ai": "^6.0.190"
     },
     "devDependencies": {
         "tsup": "^8.5.1",

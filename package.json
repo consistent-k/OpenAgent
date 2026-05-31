@@ -1,6 +1,6 @@
 {
     "name": "@oagent/oa",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "main": "./dist/index.js",
     "type": "module",
     "private": false,
@@ -14,7 +14,7 @@
         "config.example.json"
     ],
     "scripts": {
-        "build": "pnpm -r --workspace-concurrency=1 build",
+        "build": "pnpm -r --workspace-concurrency=1 build && tsup",
         "start": "tsx packages/core/src/index.tsx",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",

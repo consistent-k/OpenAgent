@@ -39,7 +39,7 @@ pnpm publish:weixin    # 单独发布 @oagent/weixin
 
 ```
 packages/                  # monorepo 子包（pnpm workspaces）
-├── core/                  # @oagent/core — 主应用源码（private，不发布）
+├── core/                  # @oagent/core — 主应用源码
 │   └── src/
 │       ├── index.tsx              # 入口，调用 Ink render(<App />)
 │       ├── App.tsx                # 主组件：编排聊天流、命令处理、会话保存

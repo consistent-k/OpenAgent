@@ -8,15 +8,16 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "rootDir": "./packages/core/src",
+        "rootDir": ".",
         "paths": {
-            "@/*": ["./packages/core/src/*"]
+            "@/*": ["./packages/core/src/*"],
+            "@oagent/core": ["./packages/core/src/index.tsx"]
         },
         "target": "ES2022",
         "lib": ["ES2022"],
         "types": ["node"],
         "jsx": "react-jsx"
     },
-    "include": ["packages/core/src/**/*"],
+    "include": ["packages/core/src/**/*", "index.ts"],
     "exclude": ["node_modules", "dist", "build"]
 }

@@ -1,6 +1,6 @@
 {
     "name": "@oagent/weixin",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "WeChat channel plugin for OpenAgent",
     "type": "module",
     "main": "./dist/index.js",
@@ -26,7 +26,7 @@
         "qrcode-terminal": "0.12.0"
     },
     "devDependencies": {
-        "@types/node": "^22.15.3",
+        "@types/node": "^25.9.1",
         "ai": "^6.0.0",
         "tsup": "^8.5.1",
         "typescript": "^6.0.0"

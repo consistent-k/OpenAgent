@@ -29,20 +29,25 @@ fi
 VERSION="${VERSIONS[0]}"
 echo "📦 Building all packages (v$VERSION)..."
 cd "$ROOT/packages/channels" && pnpm build
+cd "$ROOT/packages/core" && pnpm build
 cd "$ROOT/packages/weixin" && pnpm build
 cd "$ROOT" && pnpm build
 
 echo ""
 echo "🚀 Publishing @oagent/channels@$VERSION..."
-cd "$ROOT/packages/channels" && npm publish --access public
+cd "$ROOT/packages/channels" && pnpm publish --access public --no-git-checks
+
+echo ""
+echo "🚀 Publishing @oagent/core@$VERSION..."
+cd "$ROOT/packages/core" && pnpm publish --access public --no-git-checks
 
 echo ""
 echo "🚀 Publishing @oagent/weixin@$VERSION..."
-cd "$ROOT/packages/weixin" && npm publish --access public
+cd "$ROOT/packages/weixin" && pnpm publish --access public --no-git-checks
 
 echo ""
 echo "🚀 Publishing @oagent/oa@$VERSION..."
-cd "$ROOT" && npm publish --access public
+cd "$ROOT" && pnpm publish --access public --no-git-checks
 
 echo ""
 echo "✅ All packages published at v$VERSION!"
