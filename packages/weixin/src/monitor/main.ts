@@ -1,29 +1,25 @@
 /**
  * 微信消息监控主循环
  * 核心逻辑：长轮询接收消息 → 适配 → 调用 AI → 发送回复
- *
- * 通过依赖注入接收 runAgent，解耦宿主应用
  */
 import { SessionManager } from '@oagent/channels';
-import type { ModelMessage } from 'ai';
-import { adaptWeixinMessage } from './adapter.js';
-import { getUpdates, notifyStart, notifyStop } from './api.js';
-import { getContextToken, setContextToken, restoreContextTokens } from './context-token.js';
-import { logger } from './logger.js';
-import { StreamingMarkdownFilter } from './markdown-filter.js';
-import type { RunAgentFn, EnableAutoApproveFn } from './plugin-types.js';
-import { sendMessageWeixin } from './send.js';
-import { getSyncBufFilePath, loadGetUpdatesBuf, saveGetUpdatesBuf } from './sync-buf.js';
+import { getUpdates, notifyStart, notifyStop, DEFAULT_LONG_POLL_TIMEOUT_MS } from '../api/endpoints';
+import { adaptWeixinMessage } from '../messaging/adapter';
+import { processMessage } from '../messaging/process';
+import { getContextToken, setContextToken, restoreContextTokens } from '../storage/context-token';
+import { getSyncBufFilePath, loadGetUpdatesBuf, saveGetUpdatesBuf } from '../storage/sync-buf';
+import type { RunAgentFn } from '../types/plugin';
+import { logger } from '../utils/logger';
 
 // ---------------------------------------------------------------------------
 // 常量
 // ---------------------------------------------------------------------------
 
-const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
 const MAX_CONSECUTIVE_FAILURES = 3;
 const BACKOFF_DELAY_MS = 30_000;
 const RETRY_DELAY_MS = 2_000;
 const SESSION_EXPIRED_ERRCODE = -14;
+const SESSION_PAUSE_MS = 5 * 60_000;
 
 // ---------------------------------------------------------------------------
 // 辅助函数
@@ -43,16 +39,13 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
     });
 }
 
-/** 会话过期暂停时间（毫秒） */
-const SESSION_PAUSE_MS = 5 * 60_000;
-
 /** 检查是否为会话过期错误 */
 function isSessionExpired(resp: { ret?: number; errcode?: number }): boolean {
     return resp.errcode === SESSION_EXPIRED_ERRCODE || resp.ret === SESSION_EXPIRED_ERRCODE;
 }
 
 // ---------------------------------------------------------------------------
-// 监控配置
+// 类型定义
 // ---------------------------------------------------------------------------
 
 export type WeixinMessageEvent = {
@@ -71,8 +64,6 @@ export type MonitorWeixinOpts = {
     onMessage?: (event: WeixinMessageEvent) => void;
     /** AI Agent 调用函数 — 由宿主注入 */
     runAgent: RunAgentFn;
-    /** 工具自动审批函数 — 由宿主注入 */
-    enableAutoApprove?: EnableAutoApproveFn;
 };
 
 // ---------------------------------------------------------------------------
@@ -84,14 +75,9 @@ export type MonitorWeixinOpts = {
  * 长轮询 getUpdates → 适配消息 → 调用 runAgent → 发送回复
  */
 export async function monitorWeixinProvider(opts: MonitorWeixinOpts): Promise<void> {
-    const { baseUrl, token, accountId, abortSignal, longPollTimeoutMs, onMessage, runAgent, enableAutoApprove } = opts;
+    const { baseUrl, token, accountId, abortSignal, longPollTimeoutMs, onMessage, runAgent } = opts;
 
     logger.info(`Weixin monitor started (baseUrl=${baseUrl}, account=${accountId})`);
-
-    // 启用自动审批
-    if (enableAutoApprove) {
-        enableAutoApprove().catch((err) => logger.warn(`Failed to enable auto-approve: ${String(err)}`));
-    }
 
     // 通知服务端启动
     try {
@@ -197,7 +183,6 @@ export async function monitorWeixinProvider(opts: MonitorWeixinOpts): Promise<vo
                     sessionManager,
                     baseUrl,
                     token,
-                    accountId,
                     contextToken: msg.context_token ?? contextToken,
                     abortSignal,
                     onMessage,
@@ -231,108 +216,5 @@ export async function monitorWeixinProvider(opts: MonitorWeixinOpts): Promise<vo
         await notifyStop({ baseUrl, token });
     } catch (err) {
         logger.warn(`notifyStop failed (ignored): ${String(err)}`);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 单条消息处理
-// ---------------------------------------------------------------------------
-
-type ProcessMessageParams = {
-    userId: string;
-    text: string;
-    sessionManager: SessionManager;
-    baseUrl: string;
-    token: string;
-    accountId: string;
-    contextToken?: string;
-    abortSignal?: AbortSignal;
-    onMessage?: (event: WeixinMessageEvent) => void;
-    runAgent: RunAgentFn;
-};
-
-/**
- * 处理单条消息：追加到会话 → 调用 AI → 收集回复 → 发送
- */
-async function processMessage(params: ProcessMessageParams): Promise<void> {
-    const { userId, text, sessionManager, baseUrl, token, contextToken, abortSignal, onMessage, runAgent } = params;
-
-    // 追加用户消息到会话
-    sessionManager.appendUserMessage(userId, text);
-
-    // 通知宿主进程
-    onMessage?.({ type: 'inbound', userId, text });
-
-    // 构建消息数组（过滤 system 消息）
-    const history = sessionManager.getHistory(userId);
-    const messages: ModelMessage[] = history.filter((m) => m.role !== 'system');
-
-    logger.info(`Calling AI for user=${userId}, messages=${messages.length}, text="${text.slice(0, 50)}${text.length > 50 ? '…' : ''}"`);
-
-    try {
-        // 调用 AI Agent（通过注入的函数，微信场景减少重试次数）
-        logger.info(`Calling runAgent for user=${userId}`);
-        const result = await runAgent(messages, abortSignal, { maxRetries: 3 });
-        logger.info(`runAgent returned for user=${userId}, starting stream`);
-
-        // 收集流式文本
-        let replyText = '';
-        let chunkCount = 0;
-        for await (const chunk of result.textStream) {
-            replyText += chunk;
-            chunkCount++;
-        }
-        logger.info(`Stream completed for user=${userId}, chunks=${chunkCount}, length=${replyText.length}`);
-
-        // 应用 Markdown 过滤
-        const filter = new StreamingMarkdownFilter();
-        const filteredReply = filter.feed(replyText) + filter.flush();
-
-        if (!filteredReply.trim()) {
-            logger.warn(`Empty AI reply for user=${userId}, skipping send`);
-            // 不发送空回复，但仍然追加到会话历史
-            sessionManager.appendAssistantMessage(userId, replyText);
-            return;
-        }
-
-        // 追加 AI 回复到会话
-        sessionManager.appendAssistantMessage(userId, replyText);
-
-        // 发送回复到微信
-        logger.info(`Sending reply to=${userId}, len=${filteredReply.length}, preview="${filteredReply.slice(0, 60)}${filteredReply.length > 60 ? '…' : ''}"`);
-
-        await sendMessageWeixin({
-            to: userId,
-            text: filteredReply,
-            opts: {
-                baseUrl,
-                token,
-                contextToken
-            }
-        });
-
-        logger.info(`Reply sent successfully to=${userId}`);
-
-        // 通知宿主进程
-        onMessage?.({ type: 'reply', userId, text: filteredReply });
-    } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        logger.error(`AI processing failed for user=${userId}: ${errMsg}`);
-        onMessage?.({ type: 'error', userId, text: errMsg });
-
-        // 截断过长的错误信息，保留关键部分
-        const shortMsg = errMsg.length > 200 ? errMsg.slice(0, 200) + '...' : errMsg;
-        const userMsg = `⚠️ 处理出错: ${shortMsg}`;
-
-        // 发送错误提示给微信用户
-        try {
-            await sendMessageWeixin({
-                to: userId,
-                text: userMsg,
-                opts: { baseUrl, token, contextToken }
-            });
-        } catch (sendErr) {
-            logger.error(`Failed to send error notice to=${userId}: ${String(sendErr)}`);
-        }
     }
 }

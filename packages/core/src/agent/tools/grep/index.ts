@@ -3,7 +3,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { MAX_FILE_SIZE } from '@/config';
 import { getErrorMessage } from '@/utils/errors';
-import { resolveSafePath, ROOT_DIR } from '@/utils/safe-path';
+import { resolveReadPath, ROOT_DIR } from '@/utils/safe-path';
 import { walkDirectory } from '@/utils/walk';
 
 const DEFAULT_MAX_MATCHES = 200;
@@ -65,7 +65,7 @@ export const grepTool = tool({
         '- Use for finding keywords, function references, configuration values in code',
     inputSchema: z.object({
         pattern: z.string().describe('Keyword or JavaScript regex pattern to search for'),
-        path: z.string().describe('Relative file or directory path within the working directory'),
+        path: z.string().describe('File or directory path (relative or absolute)'),
         caseSensitive: z.boolean().optional().describe('Whether the search is case-sensitive. Defaults to true.'),
         recursive: z.boolean().optional().describe('When path is a directory, whether to search all subdirectories recursively. Defaults to false.'),
         glob: z.string().optional().describe('File name glob filter (e.g., "*.ts", "*.json"). Only applies when searching directories.'),
@@ -78,7 +78,7 @@ export const grepTool = tool({
     }),
     execute: async ({ pattern, path: searchPath, caseSensitive = true, recursive = false, glob, context = 0, head_limit, output_mode = 'content' }) => {
         const maxMatches = head_limit ?? DEFAULT_MAX_MATCHES;
-        const resolved = resolveSafePath(searchPath);
+        const resolved = resolveReadPath(searchPath);
         const stat = await fs.stat(resolved);
 
         const flags = caseSensitive ? '' : 'i';

@@ -1,7 +1,7 @@
-import { Box } from 'ink';
+import { Box, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { COMMANDS, type SlashCommand } from '../../commands';
+import { COMMANDS, findCommand, type SlashCommand } from '../../commands';
 import type { PendingToolApproval } from '../../hooks/useChatStream';
 import { getActiveMention, filterFiles, type FileEntry } from '../../utils/files';
 import type { SessionSummary } from '../../utils/sessions';
@@ -88,7 +88,7 @@ export function Input({
         fileIndex: fileSelectedIndex,
         onCommandSelect: useCallback(
             (name: string) => {
-                onChange(name);
+                onChange(name + ' ');
                 setCommandIndex(0);
             },
             [onChange]
@@ -115,6 +115,27 @@ export function Input({
     useEffect(() => {
         setFileSelectedIndex(0);
     }, [activeMention?.query]);
+
+    // Detect command prefix for inline highlighting (must be before early returns to preserve hook order)
+    const commandPrefix = useMemo(() => {
+        if (!value.startsWith('/')) return null;
+        const spaceIdx = value.indexOf(' ');
+        if (spaceIdx < 0) return null;
+        const cmdName = value.slice(0, spaceIdx);
+        if (!findCommand(cmdName)) return null;
+        return cmdName;
+    }, [value]);
+
+    // Allow backspace when command-highlighted with empty args to clear and re-enter command mode
+    const isCommandEmptyArgs = commandPrefix !== null && value.length === commandPrefix.length + 1;
+    useInput(
+        (_input, key) => {
+            if ((key.backspace || key.delete) && isCommandEmptyArgs) {
+                onChange('');
+            }
+        },
+        { isActive: !disabled && mode === 'text' && isCommandEmptyArgs }
+    );
 
     // Overlay mode: render overlay exclusively
     if (overlayType) {
@@ -170,22 +191,34 @@ export function Input({
         );
     }
 
-    // Normal text mode
-    const handleChange = (v: string) => {
+    // Normal text mode (with optional command-prefix highlighting)
+    const makeSwallowHandler = (base: string, apply: (v: string) => void) => (v: string) => {
         const c = swallowRef.current;
-        if (c && v === value + c) {
+        if (c && v === base + c) {
             swallowRef.current = null;
             return;
         }
         swallowRef.current = null;
-        onChange(v);
+        apply(v);
     };
+
+    const argsValue = commandPrefix ? value.slice(commandPrefix.length + 1) : value;
+    const handleChange = commandPrefix ? makeSwallowHandler(argsValue, (v) => onChange(commandPrefix + ' ' + v)) : makeSwallowHandler(value, (v) => onChange(v));
+    const handleSubmit = commandPrefix ? (v: string) => onSubmit(commandPrefix + ' ' + v) : (v: string) => onSubmit(v);
 
     return (
         <Box flexDirection="column">
             <ThemedBox borderColor="border" paddingX={1}>
                 <ThemedText color="accent">{'> '}</ThemedText>
-                <TextInput key={resetKey} value={value} onChange={handleChange} onSubmit={(v) => onSubmit(v)} />
+                {commandPrefix && (
+                    <>
+                        <ThemedText color="suggestion" bold>
+                            {commandPrefix}
+                        </ThemedText>
+                        <ThemedText> </ThemedText>
+                    </>
+                )}
+                <TextInput key={resetKey} value={argsValue} onChange={handleChange} onSubmit={handleSubmit} />
             </ThemedBox>
             <Divider color="border" />
         </Box>

@@ -1,13 +1,12 @@
 /**
  * 微信扫码登录
  * 提取自 @tencent-weixin/openclaw-weixin/src/auth/login-qr.ts
- * 去掉 openclaw 依赖
  */
 import { randomUUID } from 'node:crypto';
-import { apiGetFetch, apiPostFetch } from './api.js';
-import { listIndexedWeixinAccountIds, loadWeixinAccount } from './auth.js';
-import { logger } from './logger.js';
-import { redactToken } from './redact.js';
+import { apiGetFetch, apiPostFetch } from '../api/client';
+import { logger } from '../utils/logger';
+import { redactToken } from '../utils/redact';
+import { listIndexedWeixinAccountIds, loadWeixinAccount } from './accounts';
 
 type ActiveLogin = {
     sessionKey: string;

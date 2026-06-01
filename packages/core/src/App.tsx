@@ -198,16 +198,17 @@ function AppContent() {
                 const parsed = parseCommandInput(trimmed);
                 const cmdName = highlightedCommand ?? parsed.name;
                 const cmd = findCommand(cmdName);
+                const resolvedInput = parsed.args.length > 0 ? `${cmdName} ${parsed.args.join(' ')}` : cmdName;
                 if (!cmd) {
                     appendMessages([
-                        { id: uid(), role: 'user', parts: [{ type: 'text', text: trimmed }] },
-                        { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `未知命令：${trimmed}（输入 /help 查看可用命令）`, state: 'done' }] }
+                        { id: uid(), role: 'user', parts: [{ type: 'text', text: resolvedInput }] },
+                        { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `未知命令：${resolvedInput}（输入 /help 查看可用命令）`, state: 'done' }] }
                     ]);
                     return;
                 }
                 try {
                     await cmd.run({
-                        rawInput: trimmed,
+                        rawInput: resolvedInput,
                         args: parsed.args,
                         cwd,
                         fileIndexCount: fileIndex.length,
@@ -233,7 +234,7 @@ function AppContent() {
                     });
                 } catch (error) {
                     appendMessages([
-                        { id: uid(), role: 'user', parts: [{ type: 'text', text: trimmed }] },
+                        { id: uid(), role: 'user', parts: [{ type: 'text', text: resolvedInput }] },
                         { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `[命令错误] ${getErrorMessage(error)}`, state: 'done' }] }
                     ]);
                 }

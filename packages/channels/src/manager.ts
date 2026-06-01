@@ -2,7 +2,7 @@
  * Channel 管理器
  * 负责 channel 的注册、启动、停止和状态管理
  */
-import type { Channel, ChannelMessageEvent } from './types.js';
+import type { Channel, ChannelMessageEvent } from './types';
 
 export interface ChannelState {
     channel: Channel;

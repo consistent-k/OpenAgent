@@ -1,23 +1,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { CONFIG_PATH } from '@/config';
+import { CONFIG_PATH, getConfigSummary } from '@/config';
 
 // Read AGENTS.md file content if it exists in the current working directory
+let agentsContextCache: string | null = null;
+
 function getAgentsContext(): string {
+    if (agentsContextCache !== null) return agentsContextCache;
     try {
         const workDir = process.env.OPENAGENT_WORK_DIR || process.cwd();
         const agentsPath = path.join(workDir, 'AGENTS.md');
         if (fs.existsSync(agentsPath)) {
             const content = fs.readFileSync(agentsPath, 'utf-8');
-            return `\n\n## Project Context\n\n${content}`;
+            agentsContextCache = `\n\n## Project Context\n\n${content}`;
+            return agentsContextCache;
         }
     } catch {
         // Silently ignore errors reading AGENTS.md
     }
-    return '';
+    agentsContextCache = '';
+    return agentsContextCache;
 }
 
 export function getSystemPrompt(): string {
+    const config = getConfigSummary();
     return `You are OA (OpenAgent), an AI coding assistant that runs in the terminal. Your core capabilities include:
 
 - Reading, writing, and editing files
@@ -42,6 +48,7 @@ Configuration information:
 - Your configuration file is located at ${CONFIG_PATH} (NOT ~/.claude/settings.json)
 - Users can configure baseUrl, apiKey, model, and other settings in this file
 - Environment variables OPENAGENT_BASE_URL, OPENAGENT_API_KEY, OPENAGENT_MODEL can also be used
+- Currently using model: ${config.model || 'Not configured'}
 - IMPORTANT: Never output sensitive information like apiKey, api_key, API_KEY, or any other credentials in your responses. If you need to show configuration, mask sensitive values with asterisks (e.g., "sk-...abc" or "***")
 
 You are a pragmatic, efficient assistant focused on helping users solve real problems.${getAgentsContext()}`;

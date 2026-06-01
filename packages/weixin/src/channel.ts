@@ -3,23 +3,14 @@
  * 实现 @oagent/channels 的 Channel 接口
  */
 import type { Channel, ChannelStartOpts, ChannelStatus } from '@oagent/channels';
-import type { RunAgentFn, EnableAutoApproveFn } from './plugin-types.js';
-import {
-    monitorWeixinProvider,
-    listIndexedWeixinAccountIds,
-    resolveWeixinAccount,
-    startWeixinLoginWithQr,
-    waitForWeixinLogin,
-    generateQRCodeText,
-    saveWeixinAccount,
-    registerWeixinAccountId,
-    clearContextTokensForAccount,
-    clearWeixinAccount
-} from './index.js';
+import { listIndexedWeixinAccountIds, resolveWeixinAccount, saveWeixinAccount, registerWeixinAccountId, clearWeixinAccount } from './auth/accounts';
+import { startWeixinLoginWithQr, waitForWeixinLogin, generateQRCodeText } from './auth/login';
+import { monitorWeixinProvider } from './monitor/main';
+import { clearContextTokensForAccount } from './storage/context-token';
+import type { RunAgentFn } from './types/plugin';
 
 export interface WeixinChannelOpts {
     runAgent: RunAgentFn;
-    enableAutoApprove?: EnableAutoApproveFn;
 }
 
 export class WeixinChannel implements Channel {
@@ -28,11 +19,9 @@ export class WeixinChannel implements Channel {
     status: ChannelStatus = 'idle';
 
     private runAgent: RunAgentFn;
-    private enableAutoApprove?: EnableAutoApproveFn;
 
     constructor(opts: WeixinChannelOpts) {
         this.runAgent = opts.runAgent;
-        this.enableAutoApprove = opts.enableAutoApprove;
     }
 
     isConfigured(): boolean {
@@ -80,8 +69,7 @@ export class WeixinChannel implements Channel {
                         text: event.text
                     });
                 },
-                runAgent: this.runAgent,
-                enableAutoApprove: this.enableAutoApprove
+                runAgent: this.runAgent
             });
         } finally {
             this.status = 'idle';

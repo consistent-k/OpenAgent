@@ -150,10 +150,39 @@ packages/                  # monorepo 子包（pnpm workspaces）
 │       └── index.ts       # 入口
 └── weixin/      # @oagent/weixin — 微信插件
     └── src/
-        ├── index.ts       # register() 插件入口
-        ├── channel.ts     # WeixinChannel 实现
-        ├── monitor.ts     # 消息监控（runAgent 依赖注入）
-        └── ...            # 微信协议实现
+        ├── index.ts           # register() 插件入口
+        ├── channel.ts         # WeixinChannel 实现
+        ├── api/               # 微信 API 客户端与端点
+        │   ├── client.ts
+        │   ├── endpoints.ts
+        │   └── index.ts
+        ├── auth/              # 登录与账号管理
+        │   ├── accounts.ts
+        │   ├── login.ts
+        │   └── index.ts
+        ├── messaging/         # 消息收发与处理
+        │   ├── adapter.ts
+        │   ├── markdown-filter.ts
+        │   ├── process.ts
+        │   ├── send.ts
+        │   └── index.ts
+        ├── monitor/           # 消息监控（runAgent 依赖注入）
+        │   ├── main.ts
+        │   └── index.ts
+        ├── storage/           # 会话存储与同步
+        │   ├── context-token.ts
+        │   ├── sync-buf.ts
+        │   └── index.ts
+        ├── types/             # 类型定义
+        │   ├── protocol.ts
+        │   ├── plugin.ts
+        │   ├── vendor.d.ts
+        │   └── index.ts
+        └── utils/             # 工具函数
+            ├── logger.ts
+            ├── random.ts
+            ├── redact.ts
+            └── index.ts
 ```
 
 ### 核心数据流

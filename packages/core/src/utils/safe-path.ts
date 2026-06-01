@@ -18,3 +18,10 @@ export function resolveSafePath(relPath: string): string {
     }
     return real;
 }
+
+/**
+ * 读操作路径解析：不做工作目录限制，绝对路径直接使用，相对路径基于 ROOT_DIR 解析。
+ */
+export function resolveReadPath(filePath: string): string {
+    return path.resolve(ROOT_DIR, filePath);
+}

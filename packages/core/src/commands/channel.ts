@@ -15,6 +15,7 @@
 import path from 'node:path';
 import { channelManager } from '@oagent/channels';
 import { runAgent } from '../agent/index.js';
+import { ApprovalStore, APPROVABLE_TOOLS, withStore, APPROVALS_DIR } from '../agent/tools/utils/approval-store';
 import { getConfiguredChannels } from '../config/index.js';
 import { uid } from '../utils/uid';
 import type { SlashCommand } from './registry';
@@ -51,19 +52,7 @@ async function ensurePlugins(): Promise<void> {
                 continue;
             }
             // 调用插件的 register，注入 runAgent
-            mod.register(channelManager, {
-                runAgent,
-                enableAutoApprove: async () => {
-                    try {
-                        const { setToolApproval, APPROVABLE_TOOLS } = await import('../agent/tools/utils/approval-store.js');
-                        for (const tool of APPROVABLE_TOOLS) {
-                            setToolApproval(tool, true);
-                        }
-                    } catch {
-                        // ignore
-                    }
-                }
-            });
+            mod.register(channelManager, { runAgent });
         } catch (err) {
             loadError = `加载 channel 插件 "${pkgName}" 失败: ${err instanceof Error ? err.message : String(err)}`;
         }
@@ -117,6 +106,10 @@ export const channelCommand: SlashCommand = {
                     break;
                 }
 
+                // 为 channel 创建独立的审批存储，存储在 approvals/ 目录下
+                const channelStore = new ApprovalStore(path.join(APPROVALS_DIR, `${channel.id}.json`));
+                channelStore.setToolApprovals(Array.from(APPROVABLE_TOOLS, (tool) => ({ toolName: tool, approved: true })));
+
                 // 显示启动消息
                 lines.push(`🤖 ${channel.name} 启动中...`);
                 lines.push(...channel.getStatusInfo());
@@ -127,36 +120,38 @@ export const channelCommand: SlashCommand = {
                     { id: uid(), role: 'assistant', parts: [{ type: 'text', text: lines.join('\n'), state: 'done' }] }
                 ]);
 
-                // 异步启动
-                channelManager
-                    .start(target, (event) => {
-                        const prefix = event.type === 'inbound' ? `📩 [${event.channelId}]` : event.type === 'reply' ? `📤 [${event.channelId}]` : `❌ [${event.channelId}]`;
-                        appendMessages([
-                            {
-                                id: uid(),
-                                role: 'assistant',
-                                parts: [{ type: 'text', text: `${prefix} ${event.userId}\n${event.text}`, state: 'done' }]
-                            }
-                        ]);
-                    })
-                    .then(() => {
-                        appendMessages([
-                            {
-                                id: uid(),
-                                role: 'assistant',
-                                parts: [{ type: 'text', text: `⏹️ ${channel.name} 已停止`, state: 'done' }]
-                            }
-                        ]);
-                    })
-                    .catch((err) => {
-                        appendMessages([
-                            {
-                                id: uid(),
-                                role: 'assistant',
-                                parts: [{ type: 'text', text: `❌ ${channel.name} 异常退出: ${err}`, state: 'done' }]
-                            }
-                        ]);
-                    });
+                // 在 channelStore 上下文中异步启动，工具的 needsApproval 会自动使用此 store
+                withStore(channelStore, () =>
+                    channelManager
+                        .start(target, (event) => {
+                            const prefix = event.type === 'inbound' ? `📩 [${event.channelId}]` : event.type === 'reply' ? `📤 [${event.channelId}]` : `❌ [${event.channelId}]`;
+                            appendMessages([
+                                {
+                                    id: uid(),
+                                    role: 'assistant',
+                                    parts: [{ type: 'text', text: `${prefix} ${event.userId}\n${event.text}`, state: 'done' }]
+                                }
+                            ]);
+                        })
+                        .then(() => {
+                            appendMessages([
+                                {
+                                    id: uid(),
+                                    role: 'assistant',
+                                    parts: [{ type: 'text', text: `⏹️ ${channel.name} 已停止`, state: 'done' }]
+                                }
+                            ]);
+                        })
+                        .catch((err) => {
+                            appendMessages([
+                                {
+                                    id: uid(),
+                                    role: 'assistant',
+                                    parts: [{ type: 'text', text: `❌ ${channel.name} 异常退出: ${err}`, state: 'done' }]
+                                }
+                            ]);
+                        })
+                );
                 return;
             }
 

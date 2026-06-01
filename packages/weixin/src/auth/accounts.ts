@@ -1,12 +1,11 @@
 /**
  * 微信账号凭证管理
  * 简化自 @tencent-weixin/openclaw-weixin/src/auth/accounts.ts
- * 去掉 openclaw 依赖和 legacy 兼容逻辑
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { logger } from './logger.js';
+import { logger } from '../utils/logger';
 
 export const DEFAULT_BASE_URL = 'https://ilinkai.weixin.qq.com';
 export const CDN_BASE_URL = 'https://novac2c.cdn.weixin.qq.com/c2c';

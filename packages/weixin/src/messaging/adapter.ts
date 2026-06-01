@@ -2,10 +2,9 @@
  * 消息格式适配器
  * 将微信消息转换为 OpenAgent 的 ModelMessage 格式
  */
-import type { ModelMessage } from 'ai';
-import { logger } from './logger.js';
-import type { WeixinMessage, MessageItem } from './types.js';
-import { MessageItemType } from './types.js';
+import type { WeixinMessage, MessageItem } from '../types/protocol';
+import { MessageItemType } from '../types/protocol';
+import { logger } from '../utils/logger';
 
 /** 从 item_list 提取文本内容 */
 export function extractTextFromItemList(items?: MessageItem[]): string {
@@ -87,18 +86,4 @@ export function adaptWeixinMessage(msg: WeixinMessage): AdaptedMessage | null {
         userId,
         hasMedia
     };
-}
-
-/**
- * 将用户文本转换为 ModelMessage
- */
-export function toUserModelMessage(text: string): ModelMessage {
-    return { role: 'user', content: text };
-}
-
-/**
- * 将 AI 回复文本转换为 ModelMessage
- */
-export function toAssistantModelMessage(text: string): ModelMessage {
-    return { role: 'assistant', content: text };
 }

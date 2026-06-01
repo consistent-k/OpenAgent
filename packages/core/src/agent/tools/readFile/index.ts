@@ -2,13 +2,13 @@ import fs from 'node:fs/promises';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { MAX_FILE_SIZE } from '@/config';
-import { resolveSafePath } from '@/utils/safe-path';
+import { resolveReadPath } from '@/utils/safe-path';
 
 export const readFileTool = tool({
     description:
         'Read a file from the local filesystem. Use startLine/endLine to read a specific range of lines. Use this tool to view known file contents, not for listing directories or searching files.',
     inputSchema: z.object({
-        path: z.string().describe('Relative file path within the working directory. Must be a file, not a directory.'),
+        path: z.string().describe('File path (relative or absolute). Must be a file, not a directory.'),
         startLine: z.number().int().positive().optional().describe('Line number to start reading from (1-based). Defaults to 1.'),
         endLine: z.number().int().positive().optional().describe('Line number to end reading at (inclusive). Must be >= startLine.')
     }),
@@ -17,7 +17,7 @@ export const readFileTool = tool({
             throw new Error('endLine must be >= startLine');
         }
 
-        const resolved = resolveSafePath(filePath);
+        const resolved = resolveReadPath(filePath);
         const stat = await fs.stat(resolved);
         if (!stat.isFile()) {
             throw new Error(`Path is not a file: ${filePath}`);

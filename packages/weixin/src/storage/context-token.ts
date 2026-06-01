@@ -1,12 +1,11 @@
 /**
  * 微信 contextToken 管理
- * 提取自 @tencent-weixin/openclaw-weixin/src/messaging/inbound.ts
  * contextToken 用于后续请求的会话上下文
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { logger } from './logger.js';
+import { logger } from '../utils/logger';
 
 /** 内存缓存: key 为 `{accountId}:{userId}` */
 const contextTokens = new Map<string, string>();

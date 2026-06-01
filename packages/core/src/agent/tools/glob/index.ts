@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { tool } from 'ai';
 import { z } from 'zod';
-import { ROOT_DIR, resolveSafePath } from '@/utils/safe-path';
+import { ROOT_DIR, resolveReadPath } from '@/utils/safe-path';
 import { walkDirectory } from '@/utils/walk';
 
 const MAX_MATCHES = 200;
@@ -59,11 +59,11 @@ export const globTool = tool({
         '- Does not read file contents — only finds paths by pattern',
     inputSchema: z.object({
         pattern: z.string().describe('Relative glob pattern. Cannot be absolute or contain "..". E.g., "**/*.ts" or "src/**/*.md".'),
-        path: z.string().optional().describe('Relative starting directory within the working directory. Defaults to the working directory root.')
+        path: z.string().optional().describe('Starting directory (relative or absolute). Defaults to the working directory root.')
     }),
     execute: async ({ pattern, path: searchDir }) => {
         assertSafePattern(pattern);
-        const rootDir = searchDir ? resolveSafePath(searchDir) : ROOT_DIR;
+        const rootDir = searchDir ? resolveReadPath(searchDir) : ROOT_DIR;
         const regex = globToRegex(pattern);
         const results: string[] = [];
 

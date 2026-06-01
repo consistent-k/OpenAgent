@@ -80,18 +80,23 @@ packages/
 │       ├── hooks/              # useChatStream / useFileIndex
 │       ├── commands/           # 斜杠命令（registry 模式，每个命令一个文件）
 │       ├── agent/
+│       │   ├── index.ts        # 重导出 runAgent
 │       │   ├── provider.ts     # AI SDK provider 配置
 │       │   ├── runAgent.ts     # 调用 AI SDK streamText 的核心逻辑
-│       │   ├── skill/          # Skill 系统
-│       │   └── tools/          # AI 工具（单文件单工具）
+│       │   ├── system-prompt.ts # 系统提示词动态生成
+│       │   ├── skill/          # Skill 系统（experimental_createSkillTool）
+│       │   └── tools/          # AI 工具（每个工具一个文件夹）
+│       │       ├── index.ts    # 工具注册表
+│       │       └── utils/      # approval-store.ts, write-file.ts
 │       ├── ui/                 # Ink UI 组件
-│       │   ├── chat/           # 聊天交互（输入框、命令面板、确认对话框等）
-│       │   ├── messages/       # 消息渲染（文本、工具调用、推理过程等）
-│       │   ├── status/         # 状态栏（Header、StatusBar 等）
-│       │   └── text/           # 文本 & 主题基础组件（Markdown、ThemedBox 等）
-│       └── utils/              # 工具函数（文件索引、会话持久化等）
+│       │   ├── chat/           # 聊天交互（Input、ApprovalDialog、ConfigPicker、OverlaySlot 等）
+│       │   ├── messages/       # 消息渲染（TextPart、ToolCallPart、ToolCallGroup、FilePart 等）
+│       │   ├── status/         # 状态栏（Header、StatusBar、StatusIcon）
+│       │   └── text/           # 文本 & 主题基础组件（Markdown、MarkdownTable、ThemedBox 等）
+│       └── utils/              # 工具函数（files、sessions、safe-path、walk、fs、highlight 等）
 ├── channels/           # @oagent/channels — Channel SDK
 │   └── src/
+│       ├── index.ts            # 入口（导出 Channel、ChannelManager、SessionManager）
 │       ├── types.ts            # Channel 接口定义
 │       ├── manager.ts          # ChannelManager 单例
 │       └── session.ts          # SessionManager 会话管理
@@ -99,10 +104,13 @@ packages/
     └── src/
         ├── index.ts            # register() 插件入口
         ├── channel.ts          # WeixinChannel 实现
-        ├── monitor.ts          # 消息监控主循环
-        ├── api.ts              # iLink 协议 HTTP 客户端
-        ├── login.ts            # 扫码登录流程
-        └── ...                 # 消息适配、日志、Markdown 过滤等
+        ├── auth/               # 账号凭证管理 + 扫码登录
+        ├── api/                # iLink 协议 HTTP 客户端 + 端点函数
+        ├── messaging/          # 消息适配、发送、Markdown 过滤
+        ├── monitor/            # 消息监控主循环（长轮询）
+        ├── storage/            # 上下文 token 和 sync-buf 游标持久化
+        ├── types/              # iLink 协议类型 + 插件接口类型
+        └── utils/              # 日志、ID 生成、日志脱敏
 ```
 
 ## 添加新命令
@@ -120,7 +128,7 @@ packages/
 ```typescript
 import type { ChannelManager } from '@oagent/channels';
 
-export function register(manager: ChannelManager, opts: { runAgent: RunAgentFn }): void {
+export function register(manager: ChannelManager, opts: { runAgent: RunAgentFn; enableAutoApprove?: () => Promise<void> }): void {
     manager.register(new MyChannel(opts));
 }
 ```

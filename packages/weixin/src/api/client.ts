@@ -1,14 +1,14 @@
 /**
- * 微信 iLink API 客户端
- * 提取自 @tencent-weixin/openclaw-weixin/src/api/api.ts，去掉 openclaw 依赖
+ * HTTP 请求客户端
+ * 提供 iLink API 的底层 fetch 封装
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { logger } from './logger.js';
-import { redactBody, redactUrl } from './redact.js';
-import type { BaseInfo, GetUploadUrlReq, GetUploadUrlResp, GetUpdatesReq, GetUpdatesResp, NotifyStopResp, NotifyStartResp, SendMessageReq, SendTypingReq, GetConfigResp } from './types.js';
+import type { BaseInfo } from '../types/protocol';
+import { logger } from '../utils/logger';
+import { redactBody, redactUrl } from '../utils/redact';
 
 export type WeixinApiOptions = {
     baseUrl: string;
@@ -28,7 +28,6 @@ interface PackageJson {
 
 function readPackageJson(): PackageJson {
     try {
-        // 从当前文件向上查找 package.json
         let dir = path.dirname(fileURLToPath(import.meta.url));
         const { root } = path.parse(dir);
         while (dir && dir !== root) {
@@ -129,10 +128,6 @@ export function buildBaseInfo(): BaseInfo {
         bot_agent: sanitizeBotAgent(undefined)
     };
 }
-
-const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
-const DEFAULT_API_TIMEOUT_MS = 15_000;
-const DEFAULT_CONFIG_TIMEOUT_MS = 10_000;
 
 function ensureTrailingSlash(url: string): string {
     return url.endsWith('/') ? url : `${url}/`;
@@ -249,148 +244,4 @@ export async function apiPostFetch(params: { baseUrl: string; endpoint: string; 
     } finally {
         cleanup();
     }
-}
-
-/**
- * 长轮询 getUpdates
- */
-export async function getUpdates(
-    params: GetUpdatesReq & {
-        baseUrl: string;
-        token?: string;
-        timeoutMs?: number;
-        abortSignal?: AbortSignal;
-    }
-): Promise<GetUpdatesResp> {
-    const timeout = params.timeoutMs ?? DEFAULT_LONG_POLL_TIMEOUT_MS;
-    try {
-        const rawText = await apiPostFetch({
-            baseUrl: params.baseUrl,
-            endpoint: 'ilink/bot/getupdates',
-            body: JSON.stringify({
-                get_updates_buf: params.get_updates_buf ?? '',
-                base_info: buildBaseInfo()
-            }),
-            token: params.token,
-            timeoutMs: timeout,
-            label: 'getUpdates',
-            abortSignal: params.abortSignal
-        });
-        return JSON.parse(rawText) as GetUpdatesResp;
-    } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
-            if (params.abortSignal?.aborted) {
-                logger.debug('getUpdates: aborted by external signal');
-            } else {
-                logger.debug(`getUpdates: client-side timeout after ${timeout}ms`);
-            }
-            return {
-                ret: 0,
-                msgs: [],
-                get_updates_buf: params.get_updates_buf
-            };
-        }
-        throw err;
-    }
-}
-
-/** 获取 CDN 上传预签名 URL */
-export async function getUploadUrl(params: GetUploadUrlReq & WeixinApiOptions): Promise<GetUploadUrlResp> {
-    const rawText = await apiPostFetch({
-        baseUrl: params.baseUrl,
-        endpoint: 'ilink/bot/getuploadurl',
-        body: JSON.stringify({
-            filekey: params.filekey,
-            media_type: params.media_type,
-            to_user_id: params.to_user_id,
-            rawsize: params.rawsize,
-            rawfilemd5: params.rawfilemd5,
-            filesize: params.filesize,
-            thumb_rawsize: params.thumb_rawsize,
-            thumb_rawfilemd5: params.thumb_rawfilemd5,
-            thumb_filesize: params.thumb_filesize,
-            no_need_thumb: params.no_need_thumb,
-            aeskey: params.aeskey,
-            base_info: buildBaseInfo()
-        }),
-        token: params.token,
-        timeoutMs: params.timeoutMs ?? DEFAULT_API_TIMEOUT_MS,
-        label: 'getUploadUrl'
-    });
-    return JSON.parse(rawText) as GetUploadUrlResp;
-}
-
-/** 发送消息 */
-export async function sendMessage(params: WeixinApiOptions & { body: SendMessageReq }): Promise<void> {
-    await apiPostFetch({
-        baseUrl: params.baseUrl,
-        endpoint: 'ilink/bot/sendmessage',
-        body: JSON.stringify({ ...params.body, base_info: buildBaseInfo() }),
-        token: params.token,
-        timeoutMs: params.timeoutMs ?? DEFAULT_API_TIMEOUT_MS,
-        label: 'sendMessage'
-    });
-}
-
-/** 获取账号配置（typing ticket） */
-export async function getConfig(
-    params: WeixinApiOptions & {
-        ilinkUserId: string;
-        contextToken?: string;
-    }
-): Promise<GetConfigResp> {
-    const rawText = await apiPostFetch({
-        baseUrl: params.baseUrl,
-        endpoint: 'ilink/bot/getconfig',
-        body: JSON.stringify({
-            ilink_user_id: params.ilinkUserId,
-            context_token: params.contextToken,
-            base_info: buildBaseInfo()
-        }),
-        token: params.token,
-        timeoutMs: params.timeoutMs ?? DEFAULT_CONFIG_TIMEOUT_MS,
-        label: 'getConfig'
-    });
-    return JSON.parse(rawText) as GetConfigResp;
-}
-
-/** 发送输入状态指示 */
-export async function sendTyping(params: WeixinApiOptions & { body: SendTypingReq }): Promise<void> {
-    await apiPostFetch({
-        baseUrl: params.baseUrl,
-        endpoint: 'ilink/bot/sendtyping',
-        body: JSON.stringify({
-            ...params.body,
-            base_info: buildBaseInfo()
-        }),
-        token: params.token,
-        timeoutMs: params.timeoutMs ?? DEFAULT_CONFIG_TIMEOUT_MS,
-        label: 'sendTyping'
-    });
-}
-
-/** 通知服务端客户端停止 */
-export async function notifyStop(params: WeixinApiOptions): Promise<NotifyStopResp> {
-    const rawText = await apiPostFetch({
-        baseUrl: params.baseUrl,
-        endpoint: 'ilink/bot/msg/notifystop',
-        body: JSON.stringify({ base_info: buildBaseInfo() }),
-        token: params.token,
-        timeoutMs: params.timeoutMs ?? DEFAULT_CONFIG_TIMEOUT_MS,
-        label: 'notifyStop'
-    });
-    return JSON.parse(rawText) as NotifyStopResp;
-}
-
-/** 通知服务端客户端启动 */
-export async function notifyStart(params: WeixinApiOptions): Promise<NotifyStartResp> {
-    const rawText = await apiPostFetch({
-        baseUrl: params.baseUrl,
-        endpoint: 'ilink/bot/msg/notifystart',
-        body: JSON.stringify({ base_info: buildBaseInfo() }),
-        token: params.token,
-        timeoutMs: params.timeoutMs ?? DEFAULT_CONFIG_TIMEOUT_MS,
-        label: 'notifyStart'
-    });
-    return JSON.parse(rawText) as NotifyStartResp;
 }
