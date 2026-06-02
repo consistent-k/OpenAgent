@@ -1,6 +1,7 @@
 import { Text, useStdout } from 'ink';
 import type { Token, Tokens } from 'marked';
 import React, { useMemo } from 'react';
+import stringWidth from 'string-width';
 import { useTheme } from './theme';
 
 // ── ANSI helpers ──────────────────────────────────────────────────
@@ -24,10 +25,6 @@ function stripAnsi(s: string): string {
     return s.replace(STRIP_RE, '');
 }
 
-function stringWidth(s: string): number {
-    return stripAnsi(s).length;
-}
-
 // ── Text utilities ────────────────────────────────────────────────
 
 function wrapText(text: string, width: number): string[] {
@@ -43,12 +40,14 @@ function wrapText(text: string, width: number): string[] {
         if (word === '') continue;
         if (/^\s+$/.test(word)) {
             // whitespace: collapse to single space
-            if (line.length > 0) line += ' ';
+            if (stringWidth(line) > 0) line += ' ';
             continue;
         }
-        if (line.length === 0) {
+        const lineW = stringWidth(line);
+        const wordW = stringWidth(word);
+        if (lineW === 0) {
             line = word;
-        } else if (line.length + 1 + word.length <= width) {
+        } else if (lineW + 1 + wordW <= width) {
             line += ' ' + word;
         } else {
             if (line) lines.push(line);
@@ -132,9 +131,9 @@ export function MarkdownTable({ token }: Props): React.ReactNode {
 
     // Ideal widths (full content, no wrapping)
     const idealWidths = token.header.map((_, colIdx) => {
-        let max = Math.max(getPlainText(token.header[colIdx]!.tokens).length, MIN_COLUMN_WIDTH);
+        let max = Math.max(stringWidth(getPlainText(token.header[colIdx]!.tokens)), MIN_COLUMN_WIDTH);
         for (const row of token.rows) {
-            max = Math.max(max, getPlainText(row[colIdx]?.tokens).length, MIN_COLUMN_WIDTH);
+            max = Math.max(max, stringWidth(getPlainText(row[colIdx]?.tokens)), MIN_COLUMN_WIDTH);
         }
         return max;
     });

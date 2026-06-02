@@ -12,7 +12,7 @@ import { Header } from './ui/status/Header';
 import { StatusBar } from './ui/status/StatusBar';
 import { ThemeProvider, useTheme, type ThemeName } from './ui/text/theme';
 import { getErrorMessage } from './utils/errors';
-import { loadSession, saveSession } from './utils/sessions';
+import { deleteSession, listSessions, loadSession, saveSession } from './utils/sessions';
 import type { SessionSummary } from './utils/sessions';
 import { uid } from './utils/uid';
 
@@ -163,6 +163,15 @@ function AppContent() {
         [cwd, setSession, saveCurrentSession]
     );
 
+    const handleDeleteSession = useCallback(
+        async (name: string) => {
+            await deleteSession(cwd, name);
+            const updated = await listSessions(cwd);
+            setSessionPicker(updated.length > 0 ? updated : null);
+        },
+        [cwd]
+    );
+
     const handleSelectTheme = useCallback(
         (name: ThemeName) => {
             setThemeName(name);
@@ -291,6 +300,7 @@ function AppContent() {
                 onSelectOption={selectQuestionOption}
                 sessionPicker={sessionPicker}
                 onSelectSession={handleSelectSession}
+                onDeleteSession={handleDeleteSession}
                 themePicker={themePickerOpen ? themeName : null}
                 onSelectTheme={handleSelectTheme}
                 configPicker={configPickerOpen ? configItems : null}

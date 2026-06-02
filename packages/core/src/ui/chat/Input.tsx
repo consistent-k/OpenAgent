@@ -32,6 +32,7 @@ interface InputProps {
     // Picker triggers + callbacks (6)
     sessionPicker: SessionSummary[] | null;
     onSelectSession: (name: string) => void;
+    onDeleteSession: (name: string) => void;
     themePicker: ThemeName | null;
     onSelectTheme: (name: ThemeName) => void;
     configPicker: ConfigItem[] | null;
@@ -52,6 +53,7 @@ export function Input({
     onSelectOption,
     sessionPicker,
     onSelectSession,
+    onDeleteSession,
     themePicker,
     onSelectTheme,
     configPicker,
@@ -149,6 +151,7 @@ export function Input({
                 onSelectOption={onSelectOption}
                 sessionPicker={sessionPicker}
                 onSelectSession={onSelectSession}
+                onDeleteSession={onDeleteSession}
                 themePicker={themePicker}
                 onSelectTheme={onSelectTheme}
                 configPicker={configPicker}

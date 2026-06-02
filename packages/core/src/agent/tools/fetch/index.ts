@@ -74,7 +74,8 @@ export const fetchTool = tool({
                 data: method === 'POST' ? body : undefined,
                 timeout: 30000,
                 maxRedirects: 5,
-                maxContentLength: 1024 * 1024,
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
                 validateStatus: (status) => status >= 200 && status < 400
             });
 

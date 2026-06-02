@@ -24,6 +24,7 @@ export interface SessionSummary {
     savedAt: string;
     cwd: string;
     branch: string;
+    firstUserMessage?: string;
 }
 
 export async function getBranch(): Promise<string> {
@@ -96,6 +97,18 @@ async function writeIndex(dir: string, entries: SessionSummary[]): Promise<void>
     await fs.writeFile(await indexPath(dir), JSON.stringify(entries, null, 2), 'utf-8');
 }
 
+function extractFirstUserMessage(displayMessages: UIMessage[]): string | undefined {
+    for (const msg of displayMessages) {
+        if (msg.role !== 'user') continue;
+        for (const part of msg.parts) {
+            if (part.type === 'text' && part.text.trim()) {
+                return part.text.trim().replace(/\n/g, ' ').slice(0, 80);
+            }
+        }
+    }
+    return undefined;
+}
+
 export async function saveSession(cwd: string, messages: ModelMessage[], displayMessages: UIMessage[]): Promise<SavedSession> {
     const now = new Date();
     const name = now.toISOString().replace(/[:.]/g, '-');
@@ -113,8 +126,9 @@ export async function saveSession(cwd: string, messages: ModelMessage[], display
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(await sessionPath(cwd, name), JSON.stringify(session, null, 2), 'utf-8');
 
+    const firstUserMessage = extractFirstUserMessage(displayMessages);
     const entries = await readIndex(dir);
-    entries.unshift({ name, savedAt: session.savedAt, cwd: session.cwd, branch: session.branch });
+    entries.unshift({ name, savedAt: session.savedAt, cwd: session.cwd, branch: session.branch, firstUserMessage });
     await writeIndex(dir, entries);
 
     return session;
@@ -127,6 +141,17 @@ export async function loadSession(cwd: string, name: string): Promise<SavedSessi
         throw new Error(`会话文件格式不兼容：${name}`);
     }
     return session;
+}
+
+export async function deleteSession(cwd: string, name: string): Promise<void> {
+    const dir = await sessionDir(cwd);
+    const filePath = await sessionPath(cwd, name);
+    await fs.unlink(filePath).catch(() => {});
+
+    // Update index
+    const entries = await readIndex(dir);
+    const filtered = entries.filter((e) => e.name !== name);
+    await writeIndex(dir, filtered);
 }
 
 export async function listSessions(cwd: string): Promise<SessionSummary[]> {
@@ -153,7 +178,8 @@ export async function listSessions(cwd: string): Promise<SessionSummary[]> {
                         name: session.name,
                         savedAt: session.savedAt,
                         cwd: session.cwd,
-                        branch: session.branch
+                        branch: session.branch,
+                        firstUserMessage: extractFirstUserMessage(session.displayMessages)
                     };
                 } catch {
                     return null;
@@ -161,7 +187,7 @@ export async function listSessions(cwd: string): Promise<SessionSummary[]> {
             })
     );
 
-    const result = summaries.filter((summary): summary is SessionSummary => summary !== null).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    const result = summaries.filter((s): s is NonNullable<typeof s> => s !== null).sort((a, b) => b.savedAt.localeCompare(a.savedAt)) as SessionSummary[];
 
     // Migrate: write index for future reads
     if (result.length > 0) {

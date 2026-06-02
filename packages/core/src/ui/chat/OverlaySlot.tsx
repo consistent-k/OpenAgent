@@ -20,6 +20,7 @@ interface OverlaySlotProps {
     // Session picker
     sessionPicker: SessionSummary[] | null;
     onSelectSession: (name: string) => void;
+    onDeleteSession: (name: string) => void;
     // Theme picker
     themePicker: ThemeName | null;
     onSelectTheme: (name: ThemeName) => void;
@@ -39,6 +40,7 @@ export function OverlaySlot({
     onSelectOption,
     sessionPicker,
     onSelectSession,
+    onDeleteSession,
     themePicker,
     onSelectTheme,
     configPicker,
@@ -50,7 +52,7 @@ export function OverlaySlot({
     }
 
     if (overlayType === 'session' && sessionPicker) {
-        return <SessionPicker sessions={sessionPicker} onSelect={onSelectSession} onCancel={onCancelPicker} />;
+        return <SessionPicker sessions={sessionPicker} onSelect={onSelectSession} onCancel={onCancelPicker} onDelete={onDeleteSession} />;
     }
 
     if (overlayType === 'theme' && themePicker) {

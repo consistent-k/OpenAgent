@@ -1,40 +1,143 @@
-import { useInput } from 'ink';
-import React, { useState } from 'react';
-import type { SessionSummary } from '../../utils/sessions';
-import { Dialog } from '../text/Dialog';
-import { ListItem } from '../text/ListItem';
+import path from 'node:path';
+import { Box, Text, useInput } from 'ink';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Dialog } from '@/ui/text/Dialog';
+import type { SessionSummary } from '@/utils/sessions';
 
-interface SessionPickerProps {
+interface Props {
     sessions: SessionSummary[];
     onSelect: (name: string) => void;
     onCancel: () => void;
+    onDelete?: (name: string) => void;
 }
 
-function formatDate(iso: string): string {
-    return new Date(iso).toLocaleString();
+function formatTime(isoString: string): string {
+    const d = new Date(isoString);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-export function SessionPicker({ sessions, onSelect, onCancel }: SessionPickerProps) {
-    const [index, setIndex] = useState(0);
+function truncate(text: string, max: number): string {
+    if (text.length <= max) return text;
+    return text.slice(0, max - 1) + '…';
+}
+
+function getDisplayLabel(session: SessionSummary): string {
+    const time = formatTime(session.savedAt);
+    if (session.firstUserMessage) {
+        return `${truncate(session.firstUserMessage, 50)}  ${time}`;
+    }
+    return time;
+}
+
+function Scrollbar({ total, offset, visible }: { total: number; offset: number; visible: number }) {
+    if (total <= visible) return null;
+    const barHeight = Math.max(1, Math.round((visible / total) * visible));
+    const barPos = Math.round((offset / (total - visible)) * (visible - barHeight));
+    const lines: string[] = [];
+    for (let i = 0; i < visible; i++) {
+        lines.push(i >= barPos && i < barPos + barHeight ? '█' : '░');
+    }
+    return (
+        <Box flexDirection="column" marginLeft={1} justifyContent="flex-end">
+            {lines.map((ch, i) => (
+                <Text key={i} dimColor>
+                    {ch}
+                </Text>
+            ))}
+        </Box>
+    );
+}
+
+export function SessionPicker({ sessions, onSelect, onCancel, onDelete }: Props) {
+    const [selectedIdx, setSelectedIdx] = useState(0);
+    const [scrollOffset, setScrollOffset] = useState(0);
+    const VISIBLE_COUNT = 10;
+
+    const sorted = useMemo(() => [...sessions].sort((a, b) => b.savedAt.localeCompare(a.savedAt)), [sessions]);
+
+    // Clamp scroll offset
+    const maxOffset = Math.max(0, sorted.length - VISIBLE_COUNT);
+    const clampedOffset = Math.min(scrollOffset, maxOffset);
+    const visibleSessions = sorted.slice(clampedOffset, clampedOffset + VISIBLE_COUNT);
 
     useInput(
-        (_input, key) => {
-            if (key.upArrow) {
-                setIndex((i) => Math.max(0, i - 1));
-            } else if (key.downArrow) {
-                setIndex((i) => Math.min(sessions.length - 1, i + 1));
-            }
-        },
-        { isActive: true }
+        useCallback(
+            (input, key) => {
+                if (key.upArrow || input === 'k') {
+                    setSelectedIdx((prev) => {
+                        const next = prev - 1;
+                        if (next < 0) return sorted.length - 1;
+                        return next;
+                    });
+                } else if (key.downArrow || input === 'j') {
+                    setSelectedIdx((prev) => (prev + 1) % sorted.length);
+                } else if (key.pageUp) {
+                    setSelectedIdx((prev) => Math.max(0, prev - VISIBLE_COUNT));
+                } else if (key.pageDown) {
+                    setSelectedIdx((prev) => Math.min(sorted.length - 1, prev + VISIBLE_COUNT));
+                } else if (key.return) {
+                    const session = sorted[selectedIdx];
+                    if (session) {
+                        onSelect(session.name);
+                    }
+                } else if ((key.delete || key.backspace) && onDelete) {
+                    const session = sorted[selectedIdx];
+                    if (session) {
+                        onDelete(session.name);
+                    }
+                }
+            },
+            [sorted, selectedIdx, onSelect, onDelete]
+        )
     );
 
+    // Auto-scroll to keep selected item visible
+    React.useEffect(() => {
+        if (selectedIdx < clampedOffset) {
+            setScrollOffset(selectedIdx);
+        } else if (selectedIdx >= clampedOffset + VISIBLE_COUNT) {
+            setScrollOffset(selectedIdx - VISIBLE_COUNT + 1);
+        }
+    }, [selectedIdx, clampedOffset]);
+
+    if (sorted.length === 0) {
+        return (
+            <Dialog title="Sessions" onCancel={onCancel}>
+                <Box padding={1}>
+                    <Text dimColor>No saved sessions</Text>
+                </Box>
+            </Dialog>
+        );
+    }
+
     return (
-        <Dialog title="已保存会话" subtitle="↑/↓ 选择，Enter 恢复" onConfirm={() => onSelect(sessions[index]!.name)} onCancel={onCancel}>
-            {sessions.map((s, i) => (
-                <ListItem isFocused={i === index} key={s.name} description={formatDate(s.savedAt)}>
-                    {s.name}
-                </ListItem>
-            ))}
+        <Dialog title="Sessions" onCancel={onCancel}>
+            <Box flexDirection="row">
+                <Box flexDirection="column" flexGrow={1}>
+                    {visibleSessions.map((session, idx) => {
+                        const globalIdx = clampedOffset + idx;
+                        const isSelected = globalIdx === selectedIdx;
+                        const label = getDisplayLabel(session);
+                        const fileName = path.basename(session.name, '.json');
+                        return (
+                            <Box key={session.name} paddingX={1}>
+                                <Text color={isSelected ? 'cyan' : undefined} bold={isSelected} inverse={isSelected}>
+                                    {isSelected ? '▸ ' : '  '}
+                                    {label}
+                                    <Text dimColor> ({fileName})</Text>
+                                </Text>
+                            </Box>
+                        );
+                    })}
+                </Box>
+                <Scrollbar total={sorted.length} offset={clampedOffset} visible={Math.min(VISIBLE_COUNT, sorted.length)} />
+            </Box>
+            <Box paddingX={1} marginTop={1}>
+                <Text dimColor>
+                    ↑↓ navigate · PgUp/PgDn page · Enter load · Backspace delete · Esc cancel · {clampedOffset + 1}-{Math.min(clampedOffset + VISIBLE_COUNT, sorted.length)}/{sorted.length}
+                </Text>
+            </Box>
         </Dialog>
     );
 }
