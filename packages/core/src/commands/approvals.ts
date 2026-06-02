@@ -1,4 +1,4 @@
-import { APPROVABLE_TOOLS, clearAllApprovals, getApprovalSummary, setToolApproval } from '../agent/tools/utils/approval-store';
+import { APPROVABLE_TOOLS, clearAllApprovals, getApprovalSummary, setToolApproval } from '../engine/tools/utils/approval-store';
 import { uid } from '../utils/uid';
 import type { SlashCommand } from './registry';
 

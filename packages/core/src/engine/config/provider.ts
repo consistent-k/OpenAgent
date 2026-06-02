@@ -1,5 +1,5 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { getApiKey, getBaseUrl } from '../config';
+import { getApiKey, getBaseUrl } from '../../config';
 
 export function getProvider() {
     return createOpenAICompatible({

@@ -1,7 +1,8 @@
-import type { DynamicToolUIPart } from 'ai';
+import type { DynamicToolUIPart, ToolUIPart, UIMessage } from 'ai';
+import { getToolName, isToolUIPart } from 'ai';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyPart = Record<string, any>;
+type Part = UIMessage['parts'][number];
+type AnyToolPart = DynamicToolUIPart | ToolUIPart;
 
 /**
  * Collapsible tool categories — these are read-only/search tools that can be
@@ -11,25 +12,25 @@ type AnyPart = Record<string, any>;
  */
 const COLLAPSIBLE_TOOLS = new Set(['read_file', 'read_directory', 'grep', 'glob', 'fetch', 'web_search']);
 
-function isCollapsible(part: AnyPart): boolean {
-    return part.type === 'dynamic-tool' && COLLAPSIBLE_TOOLS.has((part as DynamicToolUIPart).toolName);
+function isCollapsible(part: Part): boolean {
+    return isToolUIPart(part) && COLLAPSIBLE_TOOLS.has(getToolName(part));
 }
 
 export interface ToolGroup {
     type: 'tool-group';
-    parts: DynamicToolUIPart[];
+    parts: AnyToolPart[];
     startIndex: number;
 }
 
 export interface SinglePart {
     type: 'single';
-    part: AnyPart;
+    part: Part;
     startIndex: number;
 }
 
 export type PartGroup = ToolGroup | SinglePart;
 
-export function groupParts(parts: AnyPart[]): PartGroup[] {
+export function groupParts(parts: Part[]): PartGroup[] {
     const groups: PartGroup[] = [];
     let i = 0;
 
@@ -38,13 +39,13 @@ export function groupParts(parts: AnyPart[]): PartGroup[] {
 
         if (isCollapsible(part)) {
             // Collect consecutive collapsible tools (skip reasoning between them)
-            const grouped: DynamicToolUIPart[] = [part as DynamicToolUIPart];
+            const grouped: AnyToolPart[] = [part as AnyToolPart];
             let j = i + 1;
 
             while (j < parts.length) {
                 const next = parts[j];
                 if (isCollapsible(next)) {
-                    grouped.push(next as DynamicToolUIPart);
+                    grouped.push(next as AnyToolPart);
                     j++;
                 } else if (next.type === 'reasoning') {
                     // Reasoning between collapsible tools is transparent
@@ -56,7 +57,7 @@ export function groupParts(parts: AnyPart[]): PartGroup[] {
 
             groups.push({ type: 'tool-group', parts: grouped, startIndex: i });
             i = j;
-        } else if (part.type === 'dynamic-tool') {
+        } else if (isToolUIPart(part)) {
             // Non-collapsible tool (edit, write, bash, etc.) — always individual
             groups.push({ type: 'single', part, startIndex: i });
             i++;

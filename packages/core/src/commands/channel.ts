@@ -14,9 +14,9 @@
  */
 import path from 'node:path';
 import { channelManager } from '@oagent/channels';
-import { runAgent } from '../agent/index.js';
-import { ApprovalStore, APPROVABLE_TOOLS, withStore, APPROVALS_DIR } from '../agent/tools/utils/approval-store';
-import { getConfiguredChannels } from '../config/index.js';
+import { getConfiguredChannels } from '../config';
+import { runAgent } from '../engine';
+import { ApprovalStore, APPROVABLE_TOOLS, withStore, APPROVALS_DIR } from '../engine/tools/utils/approval-store';
 import { uid } from '../utils/uid';
 import type { SlashCommand } from './registry';
 

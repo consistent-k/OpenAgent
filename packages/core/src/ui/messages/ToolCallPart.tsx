@@ -1,12 +1,15 @@
-import type { DynamicToolUIPart } from 'ai';
+import type { DynamicToolUIPart, ToolUIPart } from 'ai';
+import { getToolName } from 'ai';
 import { Box } from 'ink';
 import React from 'react';
 import { summarizeArgs } from '../../utils/summarize-args';
 import { type StringThemeKeys } from '../text/theme';
 import { ThemedText } from '../text/ThemedText';
 
+type AnyToolPart = DynamicToolUIPart | ToolUIPart;
+
 interface ToolCallPartProps {
-    part: DynamicToolUIPart;
+    part: AnyToolPart;
 }
 
 const TOOL_STATES: Record<string, { icon: string; color: StringThemeKeys; label: string }> = {
@@ -21,7 +24,7 @@ const TOOL_STATES: Record<string, { icon: string; color: StringThemeKeys; label:
 
 const MAX_PREVIEW_LINES = 3;
 
-function getResultLines(part: DynamicToolUIPart): string[] {
+function getResultLines(part: AnyToolPart): string[] {
     let raw = '';
     switch (part.state) {
         case 'output-available':
@@ -41,7 +44,7 @@ function getResultLines(part: DynamicToolUIPart): string[] {
 
 export const ToolCallPart = React.memo(function ToolCallPart({ part }: ToolCallPartProps) {
     const meta = TOOL_STATES[part.state] ?? { icon: '○', color: 'inactive', label: '' };
-    const head = `${part.toolName}(${summarizeArgs(part.input)})`;
+    const head = `${getToolName(part)}(${summarizeArgs(part.input)})`;
     const isTerminal = part.state === 'output-available' || part.state === 'output-error' || part.state === 'output-denied';
     const lines = isTerminal ? getResultLines(part) : [];
     const hasMore = lines.length > MAX_PREVIEW_LINES;

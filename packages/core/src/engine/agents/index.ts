@@ -1,9 +1,9 @@
 import { stepCountIs, streamText, type ModelMessage } from 'ai';
-import { getMaxSteps, getModelName } from '../config';
-import { getProvider } from './provider';
-import getSkill from './skill';
-import { getSystemPrompt } from './system-prompt';
-import { tools } from './tools';
+import { getProvider } from '../config/provider';
+import { getSystemPrompt } from '../config/system-prompt';
+import getSkill from '../skill';
+import { tools } from '../tools';
+import { getMaxSteps, getModelName } from '@/config';
 
 export async function runAgent(messages: ModelMessage[], abortSignal?: AbortSignal, opts?: { maxRetries?: number }) {
     const { skill } = await getSkill();

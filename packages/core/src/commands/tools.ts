@@ -1,4 +1,4 @@
-import { tools } from '../agent/tools';
+import { tools } from '../engine/tools';
 import { uid } from '../utils/uid';
 import type { SlashCommand } from './registry';
 

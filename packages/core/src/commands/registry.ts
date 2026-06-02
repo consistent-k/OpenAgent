@@ -1,5 +1,4 @@
 import type { UIMessage } from 'ai';
-import type { ModelMessage } from 'ai';
 import type { ThemeName } from '../ui/text/theme';
 import type { SessionSummary } from '../utils/sessions';
 
@@ -8,11 +7,10 @@ export interface CommandContext {
     args: string[];
     cwd: string;
     fileIndexCount: number;
-    messages: ModelMessage[];
     displayMessages: UIMessage[];
     pendingApproval: boolean;
     appendMessages: (items: UIMessage[]) => void;
-    setSession: (messages: ModelMessage[], displayMessages: UIMessage[]) => void;
+    setSession: (displayMessages: UIMessage[]) => void;
     resetSession: () => void;
     saveCurrentSession: () => Promise<void>;
     cancelResponse: () => void;

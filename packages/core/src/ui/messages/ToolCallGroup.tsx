@@ -1,12 +1,15 @@
-import type { DynamicToolUIPart } from 'ai';
+import type { DynamicToolUIPart, ToolUIPart } from 'ai';
+import { getToolName } from 'ai';
 import { Box } from 'ink';
 import React from 'react';
 import { type StringThemeKeys } from '../text/theme';
 import { ThemedText } from '../text/ThemedText';
 import { ToolCallPart } from './ToolCallPart';
 
+type AnyToolPart = DynamicToolUIPart | ToolUIPart;
+
 interface ToolCallGroupProps {
-    parts: DynamicToolUIPart[];
+    parts: AnyToolPart[];
     expanded: boolean;
 }
 
@@ -23,15 +26,16 @@ function pluralize(count: number, singular: string, plural: string): string {
     return count === 1 ? singular : plural;
 }
 
-function countByCategory(parts: DynamicToolUIPart[]): Map<string, number> {
+function countByCategory(parts: AnyToolPart[]): Map<string, number> {
     const counts = new Map<string, number>();
     for (const part of parts) {
-        counts.set(part.toolName, (counts.get(part.toolName) ?? 0) + 1);
+        const name = getToolName(part);
+        counts.set(name, (counts.get(name) ?? 0) + 1);
     }
     return counts;
 }
 
-function buildSummary(parts: DynamicToolUIPart[]): string {
+function buildSummary(parts: AnyToolPart[]): string {
     const counts = countByCategory(parts);
     const segments: string[] = [];
     const order = ['read_file', 'read_directory', 'grep', 'glob', 'fetch', 'web_search'];
@@ -56,7 +60,7 @@ function buildSummary(parts: DynamicToolUIPart[]): string {
     return segments.join(', ');
 }
 
-function getHint(part: DynamicToolUIPart): string | undefined {
+function getHint(part: AnyToolPart): string | undefined {
     const input = part.input as Record<string, unknown> | undefined;
     if (!input || typeof input !== 'object') return undefined;
 
@@ -69,7 +73,7 @@ function getHint(part: DynamicToolUIPart): string | undefined {
     return undefined;
 }
 
-function getGroupState(parts: DynamicToolUIPart[]): { icon: string; color: StringThemeKeys } {
+function getGroupState(parts: AnyToolPart[]): { icon: string; color: StringThemeKeys } {
     const hasError = parts.some((p) => p.state === 'output-error');
     const hasDenied = parts.some((p) => p.state === 'output-denied');
 

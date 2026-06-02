@@ -18,7 +18,7 @@ export const loadCommand: SlashCommand = {
         await saveCurrentSession();
         const name = args[0];
         const session = await loadSession(cwd, name);
-        setSession(session.messages, session.displayMessages);
+        setSession(session.displayMessages);
         appendMessages([
             { id: uid(), role: 'user', parts: [{ type: 'text', text: rawInput }] },
             { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `已恢复会话：${session.name}`, state: 'done' }] }

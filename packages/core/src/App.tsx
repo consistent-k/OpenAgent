@@ -1,3 +1,4 @@
+import { convertToModelMessages } from 'ai';
 import { Box, useApp, useInput } from 'ink';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { findCommand, COMMANDS, parseCommandInput } from './commands';
@@ -30,7 +31,6 @@ function AppContent() {
     const cwd = process.cwd();
     const { fileIndex, status: fileIndexStatus, reload: reloadFileIndex } = useFileIndex(cwd);
     const {
-        messages,
         displayMessages,
         status,
         usage,
@@ -140,20 +140,21 @@ function AppContent() {
     const streamingMessage = isStreaming ? lastMessage : null;
 
     const saveCurrentSession = useCallback(async () => {
-        if (messages.length === 0 && displayMessages.length === 0) return;
+        if (displayMessages.length === 0) return;
         try {
-            await saveSession(cwd, messages, displayMessages);
+            const modelMessages = await convertToModelMessages(displayMessages);
+            await saveSession(cwd, modelMessages, displayMessages);
         } catch {
             // empty
         }
-    }, [cwd, messages, displayMessages]);
+    }, [cwd, displayMessages]);
 
     const handleSelectSession = useCallback(
         async (name: string) => {
             await saveCurrentSession();
             try {
                 const session = await loadSession(cwd, name);
-                setSession(session.messages, session.displayMessages);
+                setSession(session.displayMessages);
             } catch {
                 // ignore
             }
@@ -221,7 +222,6 @@ function AppContent() {
                         args: parsed.args,
                         cwd,
                         fileIndexCount: fileIndex.length,
-                        messages,
                         displayMessages,
                         pendingApproval: pendingApproval !== null,
                         appendMessages,
@@ -261,7 +261,6 @@ function AppContent() {
             send,
             cwd,
             fileIndex.length,
-            messages,
             displayMessages,
             pendingApproval,
             setSession,

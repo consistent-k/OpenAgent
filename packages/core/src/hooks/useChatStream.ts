@@ -1,11 +1,11 @@
 import type { ModelMessage } from 'ai';
 import type { UIMessage, TextUIPart, ReasoningUIPart, DynamicToolUIPart, FileUIPart } from 'ai';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { runAgent } from '../agent';
-import { setToolApproval } from '../agent/tools/utils/approval-store';
 import { getModelName, isConfigReady } from '../config';
 import { expandMentions, type FileEntry } from '../utils/files';
 import { uid } from '../utils/uid';
+import { runAgent } from '@/engine';
+import { setToolApproval } from '@/engine/tools/utils/approval-store';
 
 export type ChatStatus = 'idle' | 'streaming' | 'awaiting_approval';
 

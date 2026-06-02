@@ -1,4 +1,4 @@
-import type { DynamicToolUIPart } from 'ai';
+import type { DynamicToolUIPart, SourceDocumentUIPart, SourceUrlUIPart, ToolUIPart, UIMessage } from 'ai';
 import { Box } from 'ink';
 import React from 'react';
 import { FilePart } from './FilePart';
@@ -6,8 +6,10 @@ import { ReasoningPart } from './ReasoningPart';
 import { TextPart } from './TextPart';
 import { ToolCallPart } from './ToolCallPart';
 
+type Part = UIMessage['parts'][number];
+
 interface PartRendererProps {
-    part: Record<string, unknown>;
+    part: Part;
     partIndex: number;
     messageId: string;
     showReasoning: boolean;
@@ -15,20 +17,33 @@ interface PartRendererProps {
 
 export function PartRenderer({ part, partIndex, messageId, showReasoning }: PartRendererProps) {
     const key = `${messageId}-${partIndex}`;
-    const type = part.type as string;
+    const { type } = part;
 
     switch (type) {
-        case 'text':
-            return <TextPart key={key} text={(part as { text: string }).text} state={(part as { state?: 'streaming' | 'done' }).state} />;
-        case 'reasoning':
-            return <ReasoningPart key={key} text={(part as { text: string }).text} state={(part as { state?: 'streaming' | 'done' }).state} showReasoning={showReasoning} />;
+        case 'text': {
+            return <TextPart key={key} text={part.text} state={part.state} />;
+        }
+        case 'reasoning': {
+            return <ReasoningPart key={key} text={part.text} state={part.state} showReasoning={showReasoning} />;
+        }
         case 'dynamic-tool':
             return <ToolCallPart key={key} part={part as DynamicToolUIPart} />;
-        case 'file':
-        case 'source':
-        case 'source-url':
-            return <FilePart key={key} mediaType={(part as { mediaType?: string }).mediaType ?? type} url={(part as { url?: string }).url ?? ''} />;
+        case 'file': {
+            return <FilePart key={key} mediaType={part.mediaType} url={part.url ?? ''} />;
+        }
+        case 'source-url': {
+            const p = part as SourceUrlUIPart;
+            return <FilePart key={key} mediaType={p.title ?? 'source'} url={p.url} />;
+        }
+        case 'source-document': {
+            const p = part as SourceDocumentUIPart;
+            return <FilePart key={key} mediaType={p.mediaType} url={p.filename ?? p.title} />;
+        }
         default:
+            // 静态工具 (type: 'tool-*') 和未知类型 fallback
+            if (type.startsWith('tool-')) {
+                return <ToolCallPart key={key} part={part as ToolUIPart} />;
+            }
             return <Box key={key} />;
     }
 }
