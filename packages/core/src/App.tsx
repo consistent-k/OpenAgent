@@ -1,5 +1,4 @@
-import { convertToModelMessages } from 'ai';
-import { Box, useApp, useInput } from 'ink';
+import { Box, Text, useApp, useInput } from 'ink';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { findCommand, COMMANDS, parseCommandInput } from './commands';
 import { getConfigSummary, saveConfig, reloadConfig, isConfigReady, type OpenAgentConfig } from './config';
@@ -13,7 +12,7 @@ import { Header } from './ui/status/Header';
 import { StatusBar } from './ui/status/StatusBar';
 import { ThemeProvider, useTheme, type ThemeName } from './ui/text/theme';
 import { getErrorMessage } from './utils/errors';
-import { deleteSession, listSessions, loadSession, saveSession } from './utils/sessions';
+import { appendHistory, deleteSession, listSessions, loadSession, saveSession } from './utils/sessions';
 import type { SessionSummary } from './utils/sessions';
 import { uid } from './utils/uid';
 
@@ -36,6 +35,7 @@ function AppContent() {
         usage,
         modelId,
         pendingApproval,
+        error,
         send,
         approvePendingTool,
         alwaysApprovePendingTool,
@@ -56,6 +56,11 @@ function AppContent() {
     const [sessionPicker, setSessionPicker] = useState<SessionSummary[] | null>(null);
     const [themePickerOpen, setThemePickerOpen] = useState(false);
     const [configPickerOpen, setConfigPickerOpen] = useState(false);
+
+    const sessionIdRef = useRef<string>(uid());
+    const newSessionId = useCallback(() => {
+        sessionIdRef.current = uid();
+    }, []);
 
     // 启动时检查配置，未完善则引导用户
     const configChecked = useRef(false);
@@ -142,31 +147,31 @@ function AppContent() {
     const saveCurrentSession = useCallback(async () => {
         if (displayMessages.length === 0) return;
         try {
-            const modelMessages = await convertToModelMessages(displayMessages);
-            await saveSession(cwd, modelMessages, displayMessages);
+            await saveSession(sessionIdRef.current, cwd, displayMessages);
         } catch {
             // empty
         }
     }, [cwd, displayMessages]);
 
     const handleSelectSession = useCallback(
-        async (name: string) => {
+        async (sessionId: string) => {
             await saveCurrentSession();
             try {
-                const session = await loadSession(cwd, name);
+                const session = await loadSession(sessionId);
                 setSession(session.displayMessages);
+                sessionIdRef.current = sessionId;
             } catch {
                 // ignore
             }
             setSessionPicker(null);
             setInputValue('');
         },
-        [cwd, setSession, saveCurrentSession]
+        [setSession, saveCurrentSession]
     );
 
     const handleDeleteSession = useCallback(
-        async (name: string) => {
-            await deleteSession(cwd, name);
+        async (sessionId: string) => {
+            await deleteSession(sessionId);
             const updated = await listSessions(cwd);
             setSessionPicker(updated.length > 0 ? updated : null);
         },
@@ -209,6 +214,10 @@ function AppContent() {
                 const cmdName = highlightedCommand ?? parsed.name;
                 const cmd = findCommand(cmdName);
                 const resolvedInput = parsed.args.length > 0 ? `${cmdName} ${parsed.args.join(' ')}` : cmdName;
+
+                // 记录解析后的完整命令到 history.jsonl
+                appendHistory(resolvedInput, cwd, sessionIdRef.current).catch(() => {});
+
                 if (!cmd) {
                     appendMessages([
                         { id: uid(), role: 'user', parts: [{ type: 'text', text: resolvedInput }] },
@@ -227,6 +236,7 @@ function AppContent() {
                         appendMessages,
                         setSession,
                         saveCurrentSession,
+                        newSessionId,
                         resetSession: reset,
                         cancelResponse: cancel,
                         reloadFileIndex,
@@ -250,6 +260,8 @@ function AppContent() {
                 return;
             }
 
+            // 记录普通消息到 history.jsonl
+            appendHistory(trimmed, cwd, sessionIdRef.current).catch(() => {});
             setInputValue('');
             await send(text);
         },
@@ -266,6 +278,7 @@ function AppContent() {
             setSession,
             cancel,
             saveCurrentSession,
+            newSessionId,
             setSessionPicker,
             themeName,
             setThemeName,
@@ -284,6 +297,11 @@ function AppContent() {
                             <PartRenderer key={`stream-${pi}`} part={part} partIndex={pi} messageId="stream" showReasoning={showReasoning} />
                         ))}
                     </Box>
+                </Box>
+            )}
+            {error && (
+                <Box flexDirection="column" paddingX={1} marginBottom={1}>
+                    <Text color="red">⚠️ {error.message}</Text>
                 </Box>
             )}
             <Input

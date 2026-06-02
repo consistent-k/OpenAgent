@@ -13,6 +13,7 @@ export interface CommandContext {
     setSession: (displayMessages: UIMessage[]) => void;
     resetSession: () => void;
     saveCurrentSession: () => Promise<void>;
+    newSessionId: () => void;
     cancelResponse: () => void;
     reloadFileIndex: () => Promise<number>;
     exit: () => void;

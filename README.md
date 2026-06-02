@@ -66,12 +66,11 @@ oa
 - `/channel`：管理消息渠道（start/stop/login/logout/status）
 - `/reload`：刷新 `@文件` 补全索引
 - `/cancel`：停止当前正在流式生成的回复
-- `/load [名称]`：恢复已保存会话
-- `/sessions`：列出当前工作目录已保存的会话
+- `/sessions`：列出并恢复已保存会话
 - `/clear`：保存当前会话并开始新会话
 - `/exit`：保存会话、停止所有渠道、退出
 
-> 每次 `/clear` 时自动保存当前会话到 `~/.openagent/sessions/{项目名}+{分支}/` 目录下，以 JSON 格式存储。
+> 每次 `/clear` 时自动保存当前会话到 `~/.openagent/sessions/<sessionId>.json`，历史记录追加到 `~/.openagent/history.jsonl`。
 
 ## Channel 插件系统
 

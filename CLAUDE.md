@@ -54,19 +54,22 @@ packages/                  # monorepo 子包（pnpm workspaces）
 │       │   ├── cancel.ts          # /cancel — 取消当前任务
 │       │   ├── channel.ts         # /channel — 管理消息渠道（动态加载插件）
 │       │   ├── clear.ts           # /clear — 清空对话（自动保存会话）
-│       │   ├── config.ts          # /config — 显示当前配置
+│       │   ├── approvals.ts       # /approvals — 管理工具审批偏好
+│       │   ├── config.ts          # /config — 打开配置选择器
 │       │   ├── exit.ts            # /exit — 退出程序
 │       │   ├── help.ts            # /help — 列出可用命令
-│       │   ├── load.ts            # /load — 加载历史会话
 │       │   ├── reload.ts          # /reload — 重新加载配置
-│       │   ├── sessions.ts        # /sessions — 管理会话列表
+│       │   ├── sessions.ts        # /sessions — 列出并恢复已保存会话
 │       │   ├── status.ts          # /status — 显示连接状态
 │       │   ├── theme.ts           # /theme — 切换主题
 │       │   └── tools.ts           # /tools — 列出可用工具
-│       ├── agent/
-│       │   ├── index.ts           # 重新导出 runAgent
-│       │   ├── provider.ts        # AI SDK provider 配置（OpenAI-compatible）
-│       │   ├── runAgent.ts        # 调用 AI SDK streamText 的核心逻辑
+│       ├── engine/                # AI 引擎（agents、tools、skill、config）
+│       │   ├── index.ts           # 公共 API：导出 runAgent、getProvider、getSystemPrompt
+│       │   ├── agents/
+│       │   │   └── index.ts       # runAgent() 核心 AI 循环
+│       │   ├── config/
+│       │   │   ├── provider.ts    # AI SDK provider 配置（OpenAI-compatible）
+│       │   │   └── system-prompt.ts # 系统提示词动态生成（读取 AGENTS.md）
 │       │   ├── skill/
 │       │   │   └── index.ts       # Skill 系统入口
 │       │   └── tools/             # AI 工具（每个工具一个文件夹，导出 tool({...})）
@@ -105,13 +108,18 @@ packages/                  # monorepo 子包（pnpm workspaces）
 │       │   │   ├── FileMentionInput.tsx # @mention 文件补全
 │       │   │   ├── FilePicker.tsx     # 文件选择器
 │       │   │   ├── SessionPicker.tsx  # 会话选择器
-│       │   │   └── ThemePicker.tsx    # 主题选择器
+│       │   │   ├── ThemePicker.tsx    # 主题选择器
+│       │   │   ├── ConfigPicker.tsx   # 配置编辑器
+│       │   │   ├── OverlaySlot.tsx    # 浮层容器
+│       │   │   └── useInputMode.ts    # 输入模式 hook
 │       │   ├── messages/          # 消息渲染
 │       │   │   ├── index.ts
 │       │   │   ├── MessageList.tsx    # 消息列表容器
 │       │   │   ├── PartRenderer.tsx   # 消息片段分发渲染
 │       │   │   ├── TextPart.tsx       # 文本片段
 │       │   │   ├── ToolCallPart.tsx   # 工具调用片段
+│       │   │   ├── ToolCallGroup.tsx  # 工具调用分组
+│       │   │   ├── groupToolParts.ts  # 工具分组逻辑
 │       │   │   ├── ReasoningPart.tsx  # 推理过程片段
 │       │   │   ├── FilePart.tsx       # 文件内容片段
 │       │   │   └── UserMessage.tsx    # 用户消息
@@ -135,13 +143,17 @@ packages/                  # monorepo 子包（pnpm workspaces）
 │       │       ├── ListItem.tsx       # 列表项
 │       │       └── KeyboardShortcutHint.tsx # 键盘快捷键提示
 │       └── utils/
+│           ├── errors.ts          # 错误信息提取
+│           ├── exec.ts            # promisified execFile
 │           ├── files.ts           # 文件索引 / @mention 解析
+│           ├── fs.ts              # 文件系统工具（ensureDirSync、readJsonFile 等）
 │           ├── markdown.ts        # Markdown 渲染工具
 │           ├── highlight.ts       # 代码语法高亮
 │           ├── safe-path.ts       # 安全路径处理
 │           ├── sessions.ts        # 会话持久化（JSON 格式存储到 ~/.openagent/sessions/）
 │           ├── summarize-args.ts  # 工具参数摘要（用于 UI 展示）
-│           └── uid.ts             # 唯一 ID 生成
+│           ├── uid.ts             # 唯一 ID 生成
+│           └── walk.ts            # 目录遍历
 ├── channels/    # @oagent/channels — Channel SDK
 │   └── src/
 │       ├── types.ts       # Channel 接口定义
@@ -190,7 +202,7 @@ packages/                  # monorepo 子包（pnpm workspaces）
 1. `App.tsx` 中的 `useChatStream` hook 负责调用 `runAgent`，后者使用 AI SDK 的 `streamText` 与模型交互。
 2. 用户输入以 `/` 开头时，通过 `commands/registry.ts` 的 `findCommand` 匹配并执行；否则作为普通消息 `send()` 到 AI。
 3. 工具调用结果通过 `pendingApproval` 状态触发 `Input` 组件中的交互式确认框（批准/拒绝）。
-4. 会话自动保存：`/clear` 时保存到 `~/.openagent/sessions/{项目名}+{分支}/`。
+4. 会话自动保存：`/clear` 时保存到 `~/.openagent/sessions/<sessionId>.json`，历史记录追加到 `~/.openagent/history.jsonl`。
 
 ## 添加新命令
 
@@ -198,7 +210,7 @@ packages/                  # monorepo 子包（pnpm workspaces）
 
 ## 添加新工具
 
-在 `packages/core/src/agent/tools/` 下新建文件，导出 `tool({...})`，然后在 `packages/core/src/agent/tools/index.ts` 的 `tools` 对象中注册。
+在 `packages/core/src/engine/tools/` 下新建文件，导出 `tool({...})`，然后在 `packages/core/src/engine/tools/index.ts` 的 `tools` 对象中注册。
 
 ## Channel 插件系统
 

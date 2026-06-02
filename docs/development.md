@@ -79,11 +79,13 @@ packages/
 │       ├── config/             # 配置管理（baseUrl、apiKey、model、maxSteps、channels）
 │       ├── hooks/              # useChatStream / useFileIndex
 │       ├── commands/           # 斜杠命令（registry 模式，每个命令一个文件）
-│       ├── agent/
-│       │   ├── index.ts        # 重导出 runAgent
-│       │   ├── provider.ts     # AI SDK provider 配置
-│       │   ├── runAgent.ts     # 调用 AI SDK streamText 的核心逻辑
-│       │   ├── system-prompt.ts # 系统提示词动态生成
+│       ├── engine/              # AI 引擎（agents、tools、skill、config）
+│       │   ├── index.ts        # 公共 API：导出 runAgent、getProvider、getSystemPrompt
+│       │   ├── agents/
+│       │   │   └── index.ts    # runAgent() 核心 AI 循环
+│       │   ├── config/
+│       │   │   ├── provider.ts     # AI SDK provider 配置
+│       │   │   └── system-prompt.ts # 系统提示词动态生成
 │       │   ├── skill/          # Skill 系统（experimental_createSkillTool）
 │       │   └── tools/          # AI 工具（每个工具一个文件夹）
 │       │       ├── index.ts    # 工具注册表
@@ -119,7 +121,7 @@ packages/
 
 ## 添加新工具
 
-在 `packages/core/src/agent/tools/` 下新建文件，导出 `tool({...})`，再到 `packages/core/src/agent/tools/index.ts` 注册。
+在 `packages/core/src/engine/tools/` 下新建文件，导出 `tool({...})`，再到 `packages/core/src/engine/tools/index.ts` 注册。
 
 ## 开发自定义 Channel 插件
 

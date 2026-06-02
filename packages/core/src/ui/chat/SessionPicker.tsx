@@ -1,20 +1,13 @@
-import path from 'node:path';
 import { Box, Text, useInput } from 'ink';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Dialog } from '@/ui/text/Dialog';
-import type { SessionSummary } from '@/utils/sessions';
+import { formatSessionTime, type SessionSummary } from '@/utils/sessions';
 
 interface Props {
     sessions: SessionSummary[];
-    onSelect: (name: string) => void;
+    onSelect: (sessionId: string) => void;
     onCancel: () => void;
-    onDelete?: (name: string) => void;
-}
-
-function formatTime(isoString: string): string {
-    const d = new Date(isoString);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    onDelete?: (sessionId: string) => void;
 }
 
 function truncate(text: string, max: number): string {
@@ -23,7 +16,7 @@ function truncate(text: string, max: number): string {
 }
 
 function getDisplayLabel(session: SessionSummary): string {
-    const time = formatTime(session.savedAt);
+    const time = formatSessionTime(new Date(session.savedAt));
     if (session.firstUserMessage) {
         return `${truncate(session.firstUserMessage, 50)}  ${time}`;
     }
@@ -79,12 +72,12 @@ export function SessionPicker({ sessions, onSelect, onCancel, onDelete }: Props)
                 } else if (key.return) {
                     const session = sorted[selectedIdx];
                     if (session) {
-                        onSelect(session.name);
+                        onSelect(session.sessionId);
                     }
                 } else if ((key.delete || key.backspace) && onDelete) {
                     const session = sorted[selectedIdx];
                     if (session) {
-                        onDelete(session.name);
+                        onDelete(session.sessionId);
                     }
                 }
             },
@@ -119,13 +112,13 @@ export function SessionPicker({ sessions, onSelect, onCancel, onDelete }: Props)
                         const globalIdx = clampedOffset + idx;
                         const isSelected = globalIdx === selectedIdx;
                         const label = getDisplayLabel(session);
-                        const fileName = path.basename(session.name, '.json');
+                        const shortId = session.sessionId.slice(0, 8);
                         return (
-                            <Box key={session.name} paddingX={1}>
+                            <Box key={session.sessionId} paddingX={1}>
                                 <Text color={isSelected ? 'cyan' : undefined} bold={isSelected} inverse={isSelected}>
                                     {isSelected ? '▸ ' : '  '}
                                     {label}
-                                    <Text dimColor> ({fileName})</Text>
+                                    <Text dimColor> ({shortId})</Text>
                                 </Text>
                             </Box>
                         );

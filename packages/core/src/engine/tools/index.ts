@@ -1,5 +1,6 @@
 import { askUserQuestionTool } from './askUserQuestion';
 import { executeBashTool } from './bash';
+import { dateTool } from './date';
 import { editFileTool } from './editFile';
 import { fetchTool } from './fetch';
 import { globTool } from './glob';
@@ -19,5 +20,6 @@ export const tools = {
     glob: globTool,
     fetch: fetchTool,
     web_search: webSearchTool,
-    ask_user_question: askUserQuestionTool
+    ask_user_question: askUserQuestionTool,
+    date: dateTool
 };

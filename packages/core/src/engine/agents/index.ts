@@ -17,9 +17,6 @@ export async function runAgent(messages: ModelMessage[], abortSignal?: AbortSign
             ...tools
         },
         abortSignal,
-        maxRetries: opts?.maxRetries ?? 10,
-        onError: ({ error }) => {
-            console.error('[runAgent] stream error:', error);
-        }
+        maxRetries: opts?.maxRetries ?? 10
     });
 }

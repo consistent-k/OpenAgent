@@ -1,7 +1,6 @@
-import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { ModelMessage, UIMessage } from 'ai';
+import type { UIMessage } from 'ai';
 import { getOpenAgentDir } from '@/config';
 import { execFileAsync } from '@/utils/exec';
 
@@ -11,19 +10,25 @@ let cachedBranch: string | null = null;
 
 interface SavedSession {
     version: number;
-    name: string;
+    sessionId: string;
+    savedAt: string;
     cwd: string;
     branch: string;
-    savedAt: string;
-    messages: ModelMessage[];
     displayMessages: UIMessage[];
 }
 
+export interface HistoryEntry {
+    display: string;
+    pastedContents: Record<string, string>;
+    timestamp: number;
+    project: string;
+    sessionId: string;
+}
+
 export interface SessionSummary {
-    name: string;
+    sessionId: string;
     savedAt: string;
-    cwd: string;
-    branch: string;
+    project: string;
     firstUserMessage?: string;
 }
 
@@ -39,160 +44,123 @@ export async function getBranch(): Promise<string> {
     }
 }
 
-function sanitizeName(name: string): string {
-    return (
-        name
-            .replace(/[^a-zA-Z0-9._-]/g, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-|-$/g, '')
-            .slice(0, 80) || 'unknown'
-    );
+export function formatSessionTime(date: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
 }
 
-function cwdHash(cwd: string): string {
-    return createHash('sha256').update(path.resolve(cwd)).digest('hex').slice(0, 8);
+// --- history.jsonl ---
+
+function historyPath(): string {
+    return path.join(getOpenAgentDir(), 'history.jsonl');
 }
 
-async function sessionDir(cwd: string): Promise<string> {
-    const projectName = sanitizeName(path.basename(path.resolve(cwd)));
-    const branch = sanitizeName(await getBranch());
-    const hash = cwdHash(cwd);
-    const base = path.join(getOpenAgentDir(), 'sessions');
-    const newDir = path.join(base, `${projectName}-${hash}+${branch}`);
+export async function appendHistory(display: string, project: string, sessionId: string): Promise<void> {
+    const entry: HistoryEntry = {
+        display,
+        pastedContents: {},
+        timestamp: Date.now(),
+        project: path.resolve(project),
+        sessionId
+    };
+    const filePath = historyPath();
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.appendFile(filePath, JSON.stringify(entry) + '\n', 'utf-8');
+}
 
-    // Migrate old directory format (projectName+branch → projectName-hash+branch)
-    const oldDir = path.join(base, `${projectName}+${branch}`);
+async function readHistory(project?: string): Promise<HistoryEntry[]> {
     try {
-        await fs.access(oldDir);
-        try {
-            await fs.access(newDir);
-        } catch {
-            await fs.rename(oldDir, newDir);
+        const content = await fs.readFile(historyPath(), 'utf-8');
+        const lines = content.trim().split('\n').filter(Boolean);
+        const entries = lines.map((line) => JSON.parse(line) as HistoryEntry);
+        if (project) {
+            const resolved = path.resolve(project);
+            return entries.filter((e) => e.project === resolved);
         }
-    } catch {
-        // old dir doesn't exist, fine
-    }
-
-    return newDir;
-}
-
-async function sessionPath(cwd: string, name: string): Promise<string> {
-    return path.join(await sessionDir(cwd), `${name}.json`);
-}
-
-async function indexPath(dir: string): Promise<string> {
-    return path.join(dir, 'index.json');
-}
-
-async function readIndex(dir: string): Promise<SessionSummary[]> {
-    try {
-        const content = await fs.readFile(await indexPath(dir), 'utf-8');
-        return JSON.parse(content) as SessionSummary[];
+        return entries;
     } catch {
         return [];
     }
 }
 
-async function writeIndex(dir: string, entries: SessionSummary[]): Promise<void> {
-    await fs.writeFile(await indexPath(dir), JSON.stringify(entries, null, 2), 'utf-8');
+// --- session files ---
+
+function sessionFilePath(sessionId: string): string {
+    return path.join(getOpenAgentDir(), 'sessions', `${sessionId}.json`);
 }
 
-function extractFirstUserMessage(displayMessages: UIMessage[]): string | undefined {
-    for (const msg of displayMessages) {
-        if (msg.role !== 'user') continue;
-        for (const part of msg.parts) {
-            if (part.type === 'text' && part.text.trim()) {
-                return part.text.trim().replace(/\n/g, ' ').slice(0, 80);
-            }
-        }
-    }
-    return undefined;
-}
-
-export async function saveSession(cwd: string, messages: ModelMessage[], displayMessages: UIMessage[]): Promise<SavedSession> {
+export async function saveSession(sessionId: string, cwd: string, displayMessages: UIMessage[]): Promise<SavedSession> {
     const now = new Date();
-    const name = now.toISOString().replace(/[:.]/g, '-');
     const branch = await getBranch();
     const session: SavedSession = {
         version: SESSION_VERSION,
-        name,
+        sessionId,
+        savedAt: now.toISOString(),
         cwd: path.resolve(cwd),
         branch,
-        savedAt: now.toISOString(),
-        messages,
         displayMessages
     };
-    const dir = await sessionDir(cwd);
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(await sessionPath(cwd, name), JSON.stringify(session, null, 2), 'utf-8');
-
-    const firstUserMessage = extractFirstUserMessage(displayMessages);
-    const entries = await readIndex(dir);
-    entries.unshift({ name, savedAt: session.savedAt, cwd: session.cwd, branch: session.branch, firstUserMessage });
-    await writeIndex(dir, entries);
-
+    const filePath = sessionFilePath(sessionId);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, JSON.stringify(session, null, 2), 'utf-8');
     return session;
 }
 
-export async function loadSession(cwd: string, name: string): Promise<SavedSession> {
-    const content = await fs.readFile(await sessionPath(cwd, name), 'utf-8');
+export async function loadSession(sessionId: string): Promise<SavedSession> {
+    const content = await fs.readFile(sessionFilePath(sessionId), 'utf-8');
     const session = JSON.parse(content) as SavedSession;
-    if (session.version !== SESSION_VERSION || !Array.isArray(session.messages) || !Array.isArray(session.displayMessages)) {
-        throw new Error(`会话文件格式不兼容：${name}`);
+    if (session.version !== SESSION_VERSION || !Array.isArray(session.displayMessages)) {
+        throw new Error(`会话文件格式不兼容：${sessionId}`);
     }
     return session;
 }
 
-export async function deleteSession(cwd: string, name: string): Promise<void> {
-    const dir = await sessionDir(cwd);
-    const filePath = await sessionPath(cwd, name);
-    await fs.unlink(filePath).catch(() => {});
+export async function deleteSession(sessionId: string): Promise<void> {
+    // 删除 session 文件
+    await fs.unlink(sessionFilePath(sessionId)).catch(() => {});
 
-    // Update index
-    const entries = await readIndex(dir);
-    const filtered = entries.filter((e) => e.name !== name);
-    await writeIndex(dir, filtered);
+    // 过滤 history.jsonl 中对应条目
+    try {
+        const content = await fs.readFile(historyPath(), 'utf-8');
+        const lines = content.trim().split('\n').filter(Boolean);
+        const filtered = lines.filter((line) => {
+            const entry = JSON.parse(line) as HistoryEntry;
+            return entry.sessionId !== sessionId;
+        });
+        await fs.writeFile(historyPath(), filtered.join('\n') + (filtered.length ? '\n' : ''), 'utf-8');
+    } catch {
+        // history.jsonl 不存在，忽略
+    }
 }
 
 export async function listSessions(cwd: string): Promise<SessionSummary[]> {
-    const dir = await sessionDir(cwd);
-    const entries = await readIndex(dir);
-    if (entries.length > 0) return entries;
+    const entries = await readHistory(cwd);
 
-    // Fallback: scan files if index is missing (e.g. old sessions without index)
-    let files: string[];
-    try {
-        files = await fs.readdir(dir);
-    } catch {
-        return [];
+    // 按 sessionId 分组
+    const groups = new Map<string, HistoryEntry[]>();
+    for (const entry of entries) {
+        const list = groups.get(entry.sessionId) ?? [];
+        list.push(entry);
+        groups.set(entry.sessionId, list);
     }
 
-    const summaries = await Promise.all(
-        files
-            .filter((file) => file.endsWith('.json') && file !== 'index.json')
-            .map(async (file) => {
-                try {
-                    const content = await fs.readFile(path.join(dir, file), 'utf-8');
-                    const session = JSON.parse(content) as SavedSession;
-                    return {
-                        name: session.name,
-                        savedAt: session.savedAt,
-                        cwd: session.cwd,
-                        branch: session.branch,
-                        firstUserMessage: extractFirstUserMessage(session.displayMessages)
-                    };
-                } catch {
-                    return null;
-                }
-            })
-    );
+    const result: SessionSummary[] = [];
+    for (const [sessionId, group] of groups) {
+        // 过滤掉只含命令（/ 开头）的幽灵会话
+        const hasUserMessage = group.some((e) => e.display.trim() && !e.display.trim().startsWith('/'));
+        if (!hasUserMessage) continue;
 
-    const result = summaries.filter((s): s is NonNullable<typeof s> => s !== null).sort((a, b) => b.savedAt.localeCompare(a.savedAt)) as SessionSummary[];
+        // firstUserMessage 取第一条非命令消息
+        const firstUserEntry = group.find((e) => e.display.trim() && !e.display.trim().startsWith('/'));
+        const latestTimestamp = Math.max(...group.map((e) => e.timestamp));
 
-    // Migrate: write index for future reads
-    if (result.length > 0) {
-        await writeIndex(dir, result);
+        result.push({
+            sessionId,
+            savedAt: new Date(latestTimestamp).toISOString(),
+            project: path.resolve(cwd),
+            firstUserMessage: firstUserEntry?.display.trim().slice(0, 80)
+        });
     }
 
-    return result;
+    return result.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
 }

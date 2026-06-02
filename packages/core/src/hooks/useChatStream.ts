@@ -1,20 +1,27 @@
-import type { ModelMessage } from 'ai';
-import type { UIMessage, TextUIPart, ReasoningUIPart, DynamicToolUIPart, FileUIPart } from 'ai';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useChat } from '@ai-sdk/react';
+import type { ModelMessage, UIMessage, UIMessageChunk, DynamicToolUIPart, ToolUIPart, ChatTransport } from 'ai';
+import { convertToModelMessages, getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getModelName, isConfigReady } from '../config';
+import { runAgent } from '../engine';
+import { setToolApproval } from '../engine/tools/utils/approval-store';
+import { getErrorMessage } from '../utils/errors';
 import { expandMentions, type FileEntry } from '../utils/files';
 import { uid } from '../utils/uid';
-import { runAgent } from '@/engine';
-import { setToolApproval } from '@/engine/tools/utils/approval-store';
 
 export type ChatStatus = 'idle' | 'streaming' | 'awaiting_approval';
-
-type AssistantPart = TextUIPart | ReasoningUIPart | DynamicToolUIPart | FileUIPart;
 
 export interface UsageInfo {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
+}
+
+export interface PendingToolApproval {
+    approvalId: string;
+    toolCallId: string;
+    toolName: string;
+    input: unknown;
 }
 
 interface UseChatStreamOptions {
@@ -29,577 +36,289 @@ interface UseChatStreamResult {
     usage: UsageInfo | null;
     modelId: string;
     pendingApproval: PendingToolApproval | null;
+    error: Error | undefined;
     send: (text: string) => Promise<void>;
     approvePendingTool: () => Promise<void>;
     alwaysApprovePendingTool: () => Promise<void>;
     denyPendingTool: (reason?: string) => Promise<void>;
     selectQuestionOption: (optionText: string) => Promise<void>;
     appendMessages: (items: UIMessage[]) => void;
-    setSession: (messages: ModelMessage[], displayMessages: UIMessage[]) => void;
+    setSession: (displayMessages: UIMessage[]) => void;
     reset: () => void;
     cancel: () => void;
 }
 
-export interface PendingToolApproval {
-    approvalId: string;
-    toolCallId: string;
-    toolName: string;
-    input: unknown;
-}
-
-function updateLastAssistant(prev: UIMessage[], updater: (parts: AssistantPart[]) => AssistantPart[]): UIMessage[] {
-    const last = prev[prev.length - 1];
-    if (!last || last.role !== 'assistant') return prev;
-    return [...prev.slice(0, -1), { ...last, parts: updater(last.parts as AssistantPart[]) }];
-}
-
-export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChatStreamResult {
-    const [messages, setMessages] = useState<ModelMessage[]>([]);
-    const [displayMessages, setDisplayMessages] = useState<UIMessage[]>([]);
-    const [status, setStatus] = useState<ChatStatus>('idle');
-    const [pendingApproval, setPendingApproval] = useState<PendingToolApproval | null>(null);
-    const [usage, setUsage] = useState<UsageInfo | null>(null);
-    const [modelId, setModelId] = useState(getModelName());
-    const messagesRef = useRef<ModelMessage[]>([]);
-    const abortControllerRef = useRef<AbortController | null>(null);
-
-    useEffect(() => {
-        messagesRef.current = messages;
-    }, [messages]);
-
-    const appendMessages = useCallback((items: UIMessage[]) => {
-        setDisplayMessages((prev) => [...prev, ...items]);
-    }, []);
-
-    const reset = useCallback(() => {
-        abortControllerRef.current?.abort('会话已清空');
-        abortControllerRef.current = null;
-        messagesRef.current = [];
-        setPendingApproval(null);
-        setMessages([]);
-        setDisplayMessages([]);
-    }, []);
-
-    const streamMessages = useCallback(async (nextMessages: ModelMessage[]) => {
-        const abortController = new AbortController();
-        abortControllerRef.current = abortController;
-        setStatus('streaming');
-
+/** 从 API 错误中提取可读的错误信息 */
+function extractApiErrorMessage(err: unknown): string {
+    const e = err as { responseBody?: string };
+    if (e.responseBody) {
         try {
-            const result = await runAgent(nextMessages, abortController.signal);
-            const uiStream = result.toUIMessageStream();
+            const body = JSON.parse(e.responseBody);
+            if (body.error?.message) return body.error.message;
+        } catch {
+            // not JSON
+        }
+    }
+    return getErrorMessage(err);
+}
 
-            for await (const chunk of uiStream) {
-                switch (chunk.type) {
-                    case 'text-start': {
-                        setDisplayMessages((prev) => updateLastAssistant(prev, (parts) => [...parts, { type: 'text' as const, text: '', state: 'streaming' as const }]));
-                        break;
-                    }
-                    case 'text-delta': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => {
-                                const last = parts[parts.length - 1];
-                                if (!last || last.type !== 'text') return parts;
-                                const updated: TextUIPart = { ...last, text: last.text + chunk.delta };
-                                return [...parts.slice(0, -1), updated];
-                            })
-                        );
-                        break;
-                    }
-                    case 'text-end': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => {
-                                const last = parts[parts.length - 1];
-                                if (!last || last.type !== 'text') return parts;
-                                return [...parts.slice(0, -1), { ...last, state: 'done' as const }];
-                            })
-                        );
-                        break;
-                    }
-                    case 'reasoning-start': {
-                        setDisplayMessages((prev) => updateLastAssistant(prev, (parts) => [...parts, { type: 'reasoning' as const, text: '', state: 'streaming' as const }]));
-                        break;
-                    }
-                    case 'reasoning-delta': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => {
-                                const last = parts[parts.length - 1];
-                                if (!last || last.type !== 'reasoning') return parts;
-                                const updated: ReasoningUIPart = { ...last, text: last.text + chunk.delta };
-                                return [...parts.slice(0, -1), updated];
-                            })
-                        );
-                        break;
-                    }
-                    case 'reasoning-end': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => {
-                                const last = parts[parts.length - 1];
-                                if (!last || last.type !== 'reasoning') return parts;
-                                return [...parts.slice(0, -1), { ...last, state: 'done' as const }];
-                            })
-                        );
-                        break;
-                    }
-                    case 'tool-input-start': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => [
-                                ...parts,
-                                {
-                                    type: 'dynamic-tool' as const,
-                                    toolName: chunk.toolName,
-                                    toolCallId: chunk.toolCallId,
-                                    state: 'input-streaming' as const,
-                                    input: '',
-                                    ...(chunk.title != null ? { title: chunk.title } : {}),
-                                    ...(chunk.toolMetadata != null ? { toolMetadata: chunk.toolMetadata } : {}),
-                                    ...(chunk.providerExecuted != null ? { providerExecuted: chunk.providerExecuted } : {})
-                                } as DynamicToolUIPart
-                            ])
-                        );
-                        break;
-                    }
-                    case 'tool-input-delta': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => {
-                                const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === chunk.toolCallId);
-                                if (idx === -1) return parts;
-                                const existing = parts[idx] as DynamicToolUIPart;
-                                const updated: DynamicToolUIPart = {
-                                    ...existing,
-                                    input: ((existing.input as string) || '') + chunk.inputTextDelta
-                                };
-                                return [...parts.slice(0, idx), updated, ...parts.slice(idx + 1)];
-                            })
-                        );
-                        break;
-                    }
-                    case 'tool-input-available': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => {
-                                const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === chunk.toolCallId);
-                                if (idx === -1) {
-                                    return [
-                                        ...parts,
-                                        {
-                                            type: 'dynamic-tool' as const,
-                                            toolName: chunk.toolName,
-                                            toolCallId: chunk.toolCallId,
-                                            state: 'input-available' as const,
-                                            input: chunk.input,
-                                            ...(chunk.dynamic != null ? { dynamic: chunk.dynamic } : {}),
-                                            ...(chunk.title != null ? { title: chunk.title } : {})
-                                        } as DynamicToolUIPart
-                                    ];
-                                }
-                                const existing = parts[idx] as DynamicToolUIPart;
-                                const updated = {
-                                    type: 'dynamic-tool' as const,
-                                    toolName: existing.toolName,
-                                    toolCallId: existing.toolCallId,
-                                    state: 'input-available' as const,
-                                    input: chunk.input,
-                                    ...(existing.title != null ? { title: existing.title } : {}),
-                                    ...(existing.toolMetadata != null ? { toolMetadata: existing.toolMetadata } : {}),
-                                    ...(existing.providerExecuted != null ? { providerExecuted: existing.providerExecuted } : {}),
-                                    ...(chunk.dynamic != null ? { dynamic: chunk.dynamic } : {}),
-                                    ...(chunk.title != null ? { title: chunk.title } : {})
-                                } as DynamicToolUIPart;
-                                return [...parts.slice(0, idx), updated, ...parts.slice(idx + 1)];
-                            })
-                        );
-                        break;
-                    }
-                    case 'tool-approval-request': {
-                        setStatus('awaiting_approval');
-                        setDisplayMessages((prev) => {
-                            const updated = updateLastAssistant(prev, (parts) => {
-                                const tool = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === chunk.toolCallId);
-                                if (tool === -1) return parts;
-                                const existing = parts[tool] as DynamicToolUIPart;
-                                const updated = {
-                                    type: 'dynamic-tool' as const,
-                                    toolName: existing.toolName,
-                                    toolCallId: existing.toolCallId,
-                                    state: 'approval-requested' as const,
-                                    input: existing.input,
-                                    title: existing.title,
-                                    toolMetadata: existing.toolMetadata,
-                                    providerExecuted: existing.providerExecuted,
-                                    approval: { id: chunk.approvalId }
-                                } as DynamicToolUIPart;
-                                return [...parts.slice(0, tool), updated, ...parts.slice(tool + 1)];
-                            });
-                            // 从更新后的 parts 中查找 toolName 和 input
-                            const last = updated[updated.length - 1];
-                            if (last && last.role === 'assistant') {
-                                const toolPart = (last.parts as AssistantPart[]).find((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === chunk.toolCallId);
-                                if (toolPart) {
-                                    setPendingApproval({
-                                        approvalId: chunk.approvalId,
-                                        toolCallId: chunk.toolCallId,
-                                        toolName: toolPart.toolName,
-                                        input: toolPart.input
-                                    });
-                                }
-                            }
-                            return updated;
-                        });
-                        break;
-                    }
-                    case 'tool-output-available': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => {
-                                const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === chunk.toolCallId);
-                                if (idx === -1) return parts;
-                                const existing = parts[idx] as DynamicToolUIPart;
-                                const existingApproval = (existing as DynamicToolUIPart & { approval?: { id: string } }).approval;
-                                const updated = {
-                                    type: 'dynamic-tool' as const,
-                                    toolName: existing.toolName,
-                                    toolCallId: existing.toolCallId,
-                                    state: 'output-available' as const,
-                                    input: existing.input,
-                                    output: chunk.output,
-                                    title: existing.title,
-                                    toolMetadata: existing.toolMetadata,
-                                    providerExecuted: existing.providerExecuted,
-                                    ...(existingApproval ? { approval: { ...existingApproval, approved: true as const } } : {})
-                                } as DynamicToolUIPart;
-                                return [...parts.slice(0, idx), updated, ...parts.slice(idx + 1)];
-                            })
-                        );
-                        break;
-                    }
-                    case 'tool-input-error': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => {
-                                const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === chunk.toolCallId);
-                                if (idx === -1) return parts;
-                                const existing = parts[idx] as DynamicToolUIPart;
-                                const existingApproval = (existing as DynamicToolUIPart & { approval?: { id: string } }).approval;
-                                const updated = {
-                                    type: 'dynamic-tool' as const,
-                                    toolName: existing.toolName,
-                                    toolCallId: existing.toolCallId,
-                                    state: 'output-error' as const,
-                                    input: existing.input,
-                                    errorText: chunk.errorText,
-                                    title: existing.title,
-                                    toolMetadata: existing.toolMetadata,
-                                    providerExecuted: existing.providerExecuted,
-                                    ...(existingApproval ? { approval: { ...existingApproval, approved: true as const } } : {})
-                                } as DynamicToolUIPart;
-                                return [...parts.slice(0, idx), updated, ...parts.slice(idx + 1)];
-                            })
-                        );
-                        break;
-                    }
-                    case 'tool-output-error': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => {
-                                const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === chunk.toolCallId);
-                                if (idx === -1) return parts;
-                                const existing = parts[idx] as DynamicToolUIPart;
-                                const existingApproval = (existing as DynamicToolUIPart & { approval?: { id: string } }).approval;
-                                const updated = {
-                                    type: 'dynamic-tool' as const,
-                                    toolName: existing.toolName,
-                                    toolCallId: existing.toolCallId,
-                                    state: 'output-error' as const,
-                                    input: existing.input,
-                                    errorText: chunk.errorText,
-                                    title: existing.title,
-                                    toolMetadata: existing.toolMetadata,
-                                    providerExecuted: existing.providerExecuted,
-                                    ...(existingApproval ? { approval: { ...existingApproval, approved: true as const } } : {})
-                                } as DynamicToolUIPart;
-                                return [...parts.slice(0, idx), updated, ...parts.slice(idx + 1)];
-                            })
-                        );
-                        break;
-                    }
-                    case 'tool-output-denied': {
-                        setDisplayMessages((prev) =>
-                            updateLastAssistant(prev, (parts) => {
-                                const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === chunk.toolCallId);
-                                if (idx === -1) return parts;
-                                const existing = parts[idx] as DynamicToolUIPart & {
-                                    approval?: { id: string };
-                                };
-                                const approvalId = existing.approval?.id || '';
-                                const updated = {
-                                    type: 'dynamic-tool' as const,
-                                    toolName: existing.toolName,
-                                    toolCallId: existing.toolCallId,
-                                    state: 'output-denied' as const,
-                                    input: existing.input,
-                                    title: existing.title,
-                                    toolMetadata: existing.toolMetadata,
-                                    providerExecuted: existing.providerExecuted,
-                                    approval: { id: approvalId, approved: false as const }
-                                } as DynamicToolUIPart;
-                                return [...parts.slice(0, idx), updated, ...parts.slice(idx + 1)];
-                            })
-                        );
-                        break;
-                    }
-                    case 'file': {
-                        setDisplayMessages((prev) => updateLastAssistant(prev, (parts) => [...parts, { type: 'file' as const, mediaType: chunk.mediaType, url: chunk.url }]));
-                        break;
-                    }
-                    case 'error': {
-                        setDisplayMessages((prev) => {
-                            const last = prev[prev.length - 1];
-                            if (!last || last.role !== 'assistant') return prev;
-                            return [
-                                ...prev.slice(0, -1),
-                                {
-                                    ...last,
-                                    parts: [...(last.parts as AssistantPart[]), { type: 'text' as const, text: `[错误] ${chunk.errorText}`, state: 'done' as const }]
-                                }
-                            ];
-                        });
-                        break;
-                    }
+/** 从 UIMessage 的 tool parts 中提取待审批/待交互信息（只扫描最后一条 assistant 消息） */
+function findPendingApproval(messages: UIMessage[]): PendingToolApproval | null {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.role !== 'assistant') continue;
+        for (const part of msg.parts) {
+            if (!isToolUIPart(part)) continue;
+            const toolPart = part as DynamicToolUIPart | ToolUIPart;
+            const toolName = getToolName(toolPart);
+
+            // 需要审批的工具（bash、write_file 等）
+            if (toolPart.state === 'approval-requested') {
+                const approval = (toolPart as { approval?: { id: string } }).approval;
+                if (approval?.id) {
+                    return {
+                        approvalId: approval.id,
+                        toolCallId: toolPart.toolCallId,
+                        toolName,
+                        input: toolPart.input
+                    };
                 }
             }
 
-            const responseMeta = await result.response;
-            const responseMessages = responseMeta.messages as ModelMessage[];
-            const completedMessages = [...messagesRef.current, ...responseMessages];
-            messagesRef.current = completedMessages;
-            setMessages(completedMessages);
-            setModelId(responseMeta.modelId);
-
-            const totalUsage = await result.totalUsage;
-            if (totalUsage) {
-                setUsage({
-                    inputTokens: totalUsage.inputTokens ?? 0,
-                    outputTokens: totalUsage.outputTokens ?? 0,
-                    totalTokens: totalUsage.totalTokens ?? 0
-                });
+            // 无 execute 的客户端工具（ask_user_question），状态为 input-available
+            if (toolPart.state === 'input-available' && toolName === 'ask_user_question') {
+                return {
+                    approvalId: toolPart.toolCallId,
+                    toolCallId: toolPart.toolCallId,
+                    toolName,
+                    input: toolPart.input
+                };
             }
-        } catch (err) {
-            if (abortController.signal.aborted) {
-                setDisplayMessages((prev) => {
-                    const last = prev[prev.length - 1];
-                    if (!last || last.role !== 'assistant') return prev;
-                    return [
-                        ...prev.slice(0, -1),
-                        {
-                            ...last,
-                            parts: [...(last.parts as AssistantPart[]), { type: 'text' as const, text: '[已取消] 本次回复已停止。', state: 'done' as const }]
-                        }
-                    ];
-                });
-                return;
-            }
-            setDisplayMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (!last || last.role !== 'assistant') return prev;
-                return [
-                    ...prev.slice(0, -1),
-                    {
-                        ...last,
-                        parts: [...(last.parts as AssistantPart[]), { type: 'text' as const, text: `[错误] ${err instanceof Error ? err.message : String(err)}`, state: 'done' as const }]
-                    }
-                ];
-            });
-        } finally {
-            if (abortControllerRef.current === abortController) {
-                abortControllerRef.current = null;
-            }
-            setStatus('idle');
         }
-    }, []);
+        break; // 只扫描最后一条 assistant 消息
+    }
+    return null;
+}
+
+/** sendAutomaticallyWhen 回调（无闭包依赖，提取为模块级函数避免每次渲染重建） */
+function shouldSendAutomatically({ messages }: { messages: UIMessage[] }) {
+    return lastAssistantMessageIsCompleteWithToolCalls({ messages }) || lastAssistantMessageIsCompleteWithApprovalResponses({ messages });
+}
+
+/** 包装流：跟踪 tool-call 生命周期，流结束时自动补发缺失的 tool-output-error chunk，同时抑制 AI SDK 内部的 console.error */
+function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableStream<UIMessageChunk> {
+    const pending = new Map<string, { toolName: string; input: unknown; dynamic?: boolean }>();
+    const origError = console.error;
+
+    return stream.pipeThrough(
+        new TransformStream<UIMessageChunk, UIMessageChunk>({
+            transform(chunk, controller) {
+                // 抑制 AI SDK 内部的 console.error
+                console.error = () => {};
+
+                if (chunk.type === 'tool-input-start') {
+                    pending.set(chunk.toolCallId, { toolName: chunk.toolName, input: '', dynamic: chunk.dynamic });
+                }
+                if (chunk.type === 'tool-input-delta') {
+                    const info = pending.get(chunk.toolCallId);
+                    if (info) info.input = (info.input as string) + chunk.inputTextDelta;
+                }
+                if (chunk.type === 'tool-input-available') {
+                    pending.set(chunk.toolCallId, { toolName: chunk.toolName, input: chunk.input, dynamic: chunk.dynamic });
+                }
+                if (chunk.type === 'tool-output-available' || chunk.type === 'tool-output-error' || chunk.type === 'tool-output-denied') {
+                    pending.delete(chunk.toolCallId);
+                }
+
+                controller.enqueue(chunk);
+            },
+            flush(controller) {
+                for (const [toolCallId, info] of pending) {
+                    controller.enqueue({
+                        type: 'tool-output-error',
+                        toolCallId,
+                        errorText: '(stream interrupted — tool result not received)',
+                        dynamic: info.dynamic
+                    } as UIMessageChunk);
+                }
+                console.error = origError;
+            }
+        })
+    );
+}
+
+export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChatStreamResult {
+    const usageRef = useRef<UsageInfo | null>(null);
+    const modelIdRef = useRef(getModelName());
+
+    // Transport is stable — reads agent lazily from ref each call
+    const transport = useMemo<ChatTransport<UIMessage>>(
+        () => ({
+            async sendMessages({ messages, abortSignal }) {
+                const modelMessage = await convertToModelMessages(messages);
+                const result = await runAgent(modelMessage, abortSignal);
+
+                // 获取 usage 信息（不阻塞流，totalUsage 在流消费完毕后自动 resolve）
+                result.totalUsage.then(
+                    (totalUsage) => {
+                        if (totalUsage) {
+                            usageRef.current = {
+                                inputTokens: totalUsage.inputTokens ?? 0,
+                                outputTokens: totalUsage.outputTokens ?? 0,
+                                totalTokens: totalUsage.totalTokens ?? 0
+                            };
+                        }
+                    },
+                    () => {
+                        // ignore usage errors
+                    }
+                );
+
+                const stream = result.toUIMessageStream({
+                    onError: (error) => extractApiErrorMessage(error)
+                }) as ReadableStream<UIMessageChunk>;
+                return patchStuckToolCalls(stream);
+            },
+            async reconnectToStream() {
+                return null;
+            }
+        }),
+        []
+    );
+
+    const {
+        messages: displayMessages,
+        status: chatStatus,
+        error,
+        sendMessage,
+        stop,
+        setMessages,
+        addToolApprovalResponse,
+        addToolOutput
+    } = useChat({
+        transport,
+        sendAutomaticallyWhen: shouldSendAutomatically
+    });
+
+    // --- 派生状态 ---
+
+    const pendingApproval = useMemo(() => findPendingApproval(displayMessages), [displayMessages]);
+
+    const status: ChatStatus = useMemo(() => {
+        if (pendingApproval) return 'awaiting_approval';
+        if (chatStatus === 'submitted' || chatStatus === 'streaming') return 'streaming';
+        return 'idle';
+    }, [chatStatus, pendingApproval]);
+
+    const [messages, setModelMessages] = useState<ModelMessage[]>([]);
+    // 只在流结束后同步 model messages（流式期间不需要频繁更新）
+    useEffect(() => {
+        if (chatStatus !== 'ready') return;
+        convertToModelMessages(displayMessages)
+            .then(setModelMessages)
+            .catch(() => setModelMessages([]));
+    }, [chatStatus, displayMessages]);
+
+    const usage = usageRef.current;
+    const modelId = modelIdRef.current;
+
+    // --- 方法 ---
 
     const send = useCallback(
         async (text: string) => {
             if (!isConfigReady()) {
-                setDisplayMessages((prev) => [
+                setMessages((prev) => [
                     ...prev,
                     { id: uid(), role: 'user', parts: [{ type: 'text', text }] },
-                    { id: uid(), role: 'assistant', parts: [{ type: 'text' as const, text: '⚠️ 配置未完善，请先输入 /config 配置 baseUrl、apiKey、model', state: 'done' as const }] }
+                    {
+                        id: uid(),
+                        role: 'assistant',
+                        parts: [{ type: 'text', text: '⚠️ 配置未完善，请先输入 /config 配置 baseUrl、apiKey、model' }]
+                    }
                 ]);
                 return;
             }
-            setDisplayMessages((prev) => [...prev, { id: uid(), role: 'user', parts: [{ type: 'text', text }] }, { id: uid(), role: 'assistant', parts: [] }]);
             const expandedText = await expandMentions(text, fileIndex, cwd);
-            const nonSystem = messagesRef.current.filter((m) => m.role !== 'system');
-            const newMessages: ModelMessage[] = [...nonSystem, { role: 'user', content: expandedText }];
-            messagesRef.current = newMessages;
-            setPendingApproval(null);
-            setMessages(newMessages);
-            await streamMessages(newMessages);
+            sendMessage({ text: expandedText });
         },
-        [fileIndex, cwd, streamMessages]
+        [fileIndex, cwd, sendMessage, setMessages]
     );
 
     const approvePendingTool = useCallback(async () => {
         if (!pendingApproval) return;
-        const approvalMessage = {
-            role: 'tool',
-            content: [
-                {
-                    type: 'tool-approval-response',
-                    approvalId: pendingApproval.approvalId,
-                    approved: true
-                }
-            ]
-        } as ModelMessage;
-        const nextMessages = [...messagesRef.current, approvalMessage];
-        messagesRef.current = nextMessages;
-        setMessages(nextMessages);
-        setPendingApproval(null);
-        setDisplayMessages((prev) =>
-            updateLastAssistant(prev, (parts) => {
-                const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === pendingApproval.toolCallId);
-                if (idx === -1) return parts;
-                const existing = parts[idx] as DynamicToolUIPart;
-                return [
-                    ...parts.slice(0, idx),
-                    {
-                        ...existing,
-                        state: 'approval-responded' as const,
-                        approval: { id: pendingApproval.approvalId, approved: true as const }
-                    } as DynamicToolUIPart,
-                    ...parts.slice(idx + 1)
-                ];
-            })
-        );
-        setDisplayMessages((prev) => [...prev, { id: uid(), role: 'assistant', parts: [] }]);
-        await streamMessages(nextMessages);
-    }, [pendingApproval, streamMessages]);
+        try {
+            await addToolApprovalResponse({
+                id: pendingApproval.approvalId,
+                approved: true
+            });
+        } catch {
+            // stream may have ended
+        }
+    }, [pendingApproval, addToolApprovalResponse]);
 
     const alwaysApprovePendingTool = useCallback(async () => {
         if (!pendingApproval) return;
         setToolApproval(pendingApproval.toolName, true);
-        const approvalMessage = {
-            role: 'tool',
-            content: [
-                {
-                    type: 'tool-approval-response',
-                    approvalId: pendingApproval.approvalId,
-                    approved: true
-                }
-            ]
-        } as ModelMessage;
-        const nextMessages = [...messagesRef.current, approvalMessage];
-        messagesRef.current = nextMessages;
-        setMessages(nextMessages);
-        setPendingApproval(null);
-        setDisplayMessages((prev) =>
-            updateLastAssistant(prev, (parts) => {
-                const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === pendingApproval.toolCallId);
-                if (idx === -1) return parts;
-                const existing = parts[idx] as DynamicToolUIPart;
-                return [
-                    ...parts.slice(0, idx),
-                    {
-                        ...existing,
-                        state: 'approval-responded' as const,
-                        approval: { id: pendingApproval.approvalId, approved: true as const }
-                    } as DynamicToolUIPart,
-                    ...parts.slice(idx + 1)
-                ];
-            })
-        );
-        setDisplayMessages((prev) => [...prev, { id: uid(), role: 'assistant', parts: [] }]);
-        await streamMessages(nextMessages);
-    }, [pendingApproval, streamMessages]);
+        try {
+            await addToolApprovalResponse({
+                id: pendingApproval.approvalId,
+                approved: true
+            });
+        } catch {
+            // stream may have ended
+        }
+    }, [pendingApproval, addToolApprovalResponse]);
 
     const denyPendingTool = useCallback(
         async (reason = '用户拒绝执行该工具') => {
             if (!pendingApproval) return;
-            const approvalMessage = {
-                role: 'tool',
-                content: [
-                    {
-                        type: 'tool-approval-response',
-                        approvalId: pendingApproval.approvalId,
-                        approved: false,
-                        reason
-                    }
-                ]
-            } as ModelMessage;
-            const nextMessages = [...messagesRef.current, approvalMessage];
-            messagesRef.current = nextMessages;
-            setMessages(nextMessages);
-            setPendingApproval(null);
-            setDisplayMessages((prev) =>
-                updateLastAssistant(prev, (parts) => {
-                    const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === pendingApproval.toolCallId);
-                    if (idx === -1) return parts;
-                    const existing = parts[idx] as DynamicToolUIPart;
-                    return [
-                        ...parts.slice(0, idx),
-                        {
-                            ...existing,
-                            state: 'output-denied' as const,
-                            approval: { id: pendingApproval.approvalId, approved: false as const, reason }
-                        } as DynamicToolUIPart,
-                        ...parts.slice(idx + 1)
-                    ];
-                })
-            );
-            setDisplayMessages((prev) => [...prev, { id: uid(), role: 'assistant', parts: [] }]);
-            await streamMessages(nextMessages);
+            try {
+                await addToolApprovalResponse({
+                    id: pendingApproval.approvalId,
+                    approved: false,
+                    reason
+                });
+            } catch {
+                // stream may have ended
+            }
         },
-        [pendingApproval, streamMessages]
+        [pendingApproval, addToolApprovalResponse]
     );
 
     const selectQuestionOption = useCallback(
         async (optionText: string) => {
             if (!pendingApproval) return;
-            const toolResultMessage = {
-                role: 'tool',
-                content: [
-                    {
-                        type: 'tool-result',
-                        toolCallId: pendingApproval.toolCallId,
-                        toolName: pendingApproval.toolName,
-                        output: { type: 'json', value: { selected: optionText } }
-                    }
-                ]
-            } as ModelMessage;
-            const nextMessages = [...messagesRef.current, toolResultMessage];
-            messagesRef.current = nextMessages;
-            setMessages(nextMessages);
-            setPendingApproval(null);
-            setDisplayMessages((prev) =>
-                updateLastAssistant(prev, (parts) => {
-                    const idx = parts.findIndex((p): p is DynamicToolUIPart => p.type === 'dynamic-tool' && p.toolCallId === pendingApproval.toolCallId);
-                    if (idx === -1) return parts;
-                    const existing = parts[idx] as DynamicToolUIPart;
-                    return [
-                        ...parts.slice(0, idx),
-                        {
-                            ...existing,
-                            state: 'output-available' as const,
-                            input: { ...((existing.input as Record<string, unknown>) || {}), _selectedOption: optionText },
-                            output: JSON.stringify({ selected: optionText })
-                        } as DynamicToolUIPart,
-                        ...parts.slice(idx + 1)
-                    ];
-                })
-            );
-            setDisplayMessages((prev) => [...prev, { id: uid(), role: 'assistant', parts: [] }]);
-            await streamMessages(nextMessages);
+            addToolOutput({
+                tool: 'ask_user_question',
+                toolCallId: pendingApproval.toolCallId,
+                output: { selected: optionText }
+            });
         },
-        [pendingApproval, streamMessages]
+        [pendingApproval, addToolOutput]
     );
 
-    const setSession = useCallback((nextMessages: ModelMessage[], nextDisplayMessages: UIMessage[]) => {
-        messagesRef.current = nextMessages;
-        setMessages(nextMessages);
-        setDisplayMessages(nextDisplayMessages);
-        setPendingApproval(null);
-    }, []);
+    const appendMessages = useCallback(
+        (items: UIMessage[]) => {
+            setMessages((prev) => [...prev, ...items]);
+        },
+        [setMessages]
+    );
+
+    const setSessionFn = useCallback(
+        (displayMessages: UIMessage[]) => {
+            setMessages(displayMessages);
+        },
+        [setMessages]
+    );
+
+    const reset = useCallback(() => {
+        stop();
+        setMessages([]);
+    }, [stop, setMessages]);
 
     const cancel = useCallback(() => {
-        abortControllerRef.current?.abort('用户取消');
-    }, []);
+        stop();
+    }, [stop]);
 
     return {
         messages,
@@ -608,13 +327,14 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
         usage,
         modelId,
         pendingApproval,
+        error,
         send,
         approvePendingTool,
         alwaysApprovePendingTool,
         denyPendingTool,
         selectQuestionOption,
         appendMessages,
-        setSession,
+        setSession: setSessionFn,
         reset,
         cancel
     };

@@ -5,7 +5,6 @@ import { clearCommand } from './clear';
 import { configCommand } from './config';
 import { exitCommand } from './exit';
 import { helpCommand } from './help';
-import { loadCommand } from './load';
 import type { SlashCommand } from './registry';
 import { reloadCommand } from './reload';
 import { sessionsCommand } from './sessions';
@@ -23,7 +22,6 @@ export const COMMANDS: SlashCommand[] = [
     channelCommand,
     reloadCommand,
     cancelCommand,
-    loadCommand,
     sessionsCommand,
     clearCommand,
     exitCommand
