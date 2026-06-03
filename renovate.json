@@ -1,0 +1,22 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": ["config:recommended"],
+    "timezone": "Asia/Shanghai",
+    "schedule": ["before 12pm on friday"],
+    "prConcurrentLimit": 10,
+    "packageRules": [
+        {
+            "matchUpdateTypes": ["patch", "minor"],
+            "automerge": true,
+            "platformAutomerge": true
+        },
+        {
+            "matchUpdateTypes": ["major"],
+            "automerge": false
+        },
+        {
+            "matchPackageNames": ["typescript", "@types/node"],
+            "groupName": "typescript"
+        }
+    ]
+}
