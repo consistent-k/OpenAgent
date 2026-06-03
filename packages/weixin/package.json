@@ -22,12 +22,12 @@
     },
     "dependencies": {
         "@oagent/channels": "workspace:*",
-        "axios": "^1.16.1",
+        "axios": "^1.17.0",
         "qrcode-terminal": "0.12.0"
     },
     "devDependencies": {
         "@types/node": "^25.9.1",
-        "ai": "^6.0.193",
+        "ai": "^6.0.195",
         "tsup": "^8.5.1",
         "typescript": "^6.0.0"
     },
