@@ -1,0 +1,36 @@
+{
+    "name": "@oagent/telegram",
+    "version": "1.0.3",
+    "description": "Telegram channel plugin for OpenAgent",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "clean": "rm -rf dist",
+        "build": "tsup",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@oagent/channels": "workspace:*",
+        "axios": "^1.17.0"
+    },
+    "devDependencies": {
+        "@types/node": "^25.9.1",
+        "ai": "^6.0.195",
+        "tsup": "^8.5.1",
+        "typescript": "^6.0.0"
+    },
+    "engines": {
+        "node": ">=22"
+    }
+}

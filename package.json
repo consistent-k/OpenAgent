@@ -38,6 +38,8 @@
         "@oagent/core": "workspace:*"
     },
     "devDependencies": {
+        "@oagent/telegram": "workspace:*",
+        "@oagent/weixin": "workspace:*",
         "@commitlint/cli": "^21.0.2",
         "@commitlint/config-conventional": "^21.0.2",
         "@types/node": "^25.9.1",

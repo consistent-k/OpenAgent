@@ -193,6 +193,21 @@ export const channelCommand: SlashCommand = {
                     break;
                 }
 
+                // 支持 /channel login <id> <token> 格式（如 Telegram）
+                const token = args[2] ?? '';
+                if (token && 'configureToken' in channel && typeof (channel as Record<string, unknown>).configureToken === 'function') {
+                    appendMessages([{ id: uid(), role: 'user', parts: [{ type: 'text', text: rawInput }] }]);
+                    (channel as { configureToken: (t: string) => Promise<string[]> })
+                        .configureToken(token)
+                        .then((resultLines: string[]) => {
+                            appendMessages([{ id: uid(), role: 'assistant', parts: [{ type: 'text', text: resultLines.join('\n'), state: 'done' }] }]);
+                        })
+                        .catch((err: unknown) => {
+                            appendMessages([{ id: uid(), role: 'assistant', parts: [{ type: 'text', text: `❌ ${channel.name} 配置失败: ${err}`, state: 'done' }] }]);
+                        });
+                    return;
+                }
+
                 appendMessages([{ id: uid(), role: 'user', parts: [{ type: 'text', text: rawInput }] }]);
 
                 // 异步执行，不阻塞 TUI

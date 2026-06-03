@@ -18,6 +18,12 @@ importers:
       '@commitlint/config-conventional':
         specifier: ^21.0.2
         version: 21.0.2
+      '@oagent/telegram':
+        specifier: workspace:*
+        version: link:packages/telegram
+      '@oagent/weixin':
+        specifier: workspace:*
+        version: link:packages/weixin
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
@@ -131,6 +137,28 @@ importers:
       '@types/react':
         specifier: ^19.2.16
         version: 19.2.16
+
+  packages/telegram:
+    dependencies:
+      '@oagent/channels':
+        specifier: workspace:*
+        version: link:../channels
+      axios:
+        specifier: ^1.17.0
+        version: 1.17.0
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      ai:
+        specifier: ^6.0.195
+        version: 6.0.195(zod@4.4.3)
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^6.0.0
+        version: 6.0.3
 
   packages/weixin:
     dependencies:
