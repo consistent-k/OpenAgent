@@ -11,6 +11,7 @@ import { sessionsCommand } from './sessions';
 import { statusCommand } from './status';
 import { themeCommand } from './theme';
 import { toolsCommand } from './tools';
+import { updateCommand } from './update';
 
 export const COMMANDS: SlashCommand[] = [
     helpCommand,
@@ -24,6 +25,7 @@ export const COMMANDS: SlashCommand[] = [
     cancelCommand,
     sessionsCommand,
     clearCommand,
+    updateCommand,
     exitCommand
 ];
 
