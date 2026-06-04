@@ -1,6 +1,6 @@
 {
     "name": "@oagent/telegram",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "Telegram channel plugin for OpenAgent",
     "type": "module",
     "main": "./dist/index.js",

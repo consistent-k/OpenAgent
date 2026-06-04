@@ -27,7 +27,7 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: 构建工作区依赖
-              run: pnpm --filter @oagent/channels build
+              run: pnpm -r build
 
             - name: ESLint 检查
               run: pnpm lint

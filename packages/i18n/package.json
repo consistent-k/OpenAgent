@@ -1,6 +1,6 @@
 {
     "name": "@oagent/i18n",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "i18n engine for OpenAgent with built-in zh/en and third-party locale extension support",
     "type": "module",
     "main": "./dist/index.js",
