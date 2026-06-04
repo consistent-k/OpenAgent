@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import type { DynamicToolUIPart, ToolUIPart } from 'ai';
 import { getToolName } from 'ai';
 import { Box } from 'ink';
@@ -13,14 +14,18 @@ interface ToolCallGroupProps {
     expanded: boolean;
 }
 
-const TOOL_VERBS: Record<string, { active: string; done: string; singular: string; plural: string }> = {
-    read_file: { active: 'Reading', done: 'Read', singular: 'file', plural: 'files' },
-    read_directory: { active: 'Listing', done: 'Listed', singular: 'directory', plural: 'directories' },
-    grep: { active: 'Searching', done: 'Searched', singular: 'pattern', plural: 'patterns' },
-    glob: { active: 'Finding', done: 'Found', singular: 'pattern', plural: 'patterns' },
-    fetch: { active: 'Fetching', done: 'Fetched', singular: 'url', plural: 'urls' },
-    web_search: { active: 'Searching', done: 'Searched', singular: 'query', plural: 'queries' }
-};
+type ToolVerbs = Record<string, { active: string; done: string; singular: string; plural: string }>;
+
+function getToolVerbs(): ToolVerbs {
+    return {
+        read_file: { active: t('tool.verb.reading'), done: t('tool.verb.read'), singular: t('tool.verb.file'), plural: t('tool.verb.files') },
+        read_directory: { active: t('tool.verb.listing'), done: t('tool.verb.listed'), singular: t('tool.verb.directory'), plural: t('tool.verb.directories') },
+        grep: { active: t('tool.verb.searching'), done: t('tool.verb.searched'), singular: t('tool.verb.pattern'), plural: t('tool.verb.patterns') },
+        glob: { active: t('tool.verb.finding'), done: t('tool.verb.found'), singular: t('tool.verb.pattern'), plural: t('tool.verb.patterns') },
+        fetch: { active: t('tool.verb.fetching'), done: t('tool.verb.fetched'), singular: t('tool.verb.url'), plural: t('tool.verb.urls') },
+        web_search: { active: t('tool.verb.searching'), done: t('tool.verb.searched'), singular: t('tool.verb.query'), plural: t('tool.verb.queries') }
+    };
+}
 
 function pluralize(count: number, singular: string, plural: string): string {
     return count === 1 ? singular : plural;
@@ -35,7 +40,7 @@ function countByCategory(parts: AnyToolPart[]): Map<string, number> {
     return counts;
 }
 
-function buildSummary(parts: AnyToolPart[]): string {
+function buildSummary(parts: AnyToolPart[], toolVerbs: ToolVerbs): string {
     const counts = countByCategory(parts);
     const segments: string[] = [];
     const order = ['read_file', 'read_directory', 'grep', 'glob', 'fetch', 'web_search'];
@@ -43,7 +48,7 @@ function buildSummary(parts: AnyToolPart[]): string {
     for (const toolName of order) {
         const count = counts.get(toolName);
         if (!count) continue;
-        const verbs = TOOL_VERBS[toolName];
+        const verbs = toolVerbs[toolName];
         if (verbs) {
             segments.push(`${verbs.done} ${count} ${pluralize(count, verbs.singular, verbs.plural)}`);
         } else {
@@ -83,6 +88,8 @@ function getGroupState(parts: AnyToolPart[]): { icon: string; color: StringTheme
 }
 
 export const ToolCallGroup = React.memo(function ToolCallGroup({ parts, expanded }: ToolCallGroupProps) {
+    const toolVerbs = getToolVerbs();
+
     // Single tool call: render as individual tool (no group wrapper)
     if (parts.length === 1) {
         return (
@@ -103,7 +110,7 @@ export const ToolCallGroup = React.memo(function ToolCallGroup({ parts, expanded
                 <Box paddingLeft={1} flexDirection="column">
                     <ThemedText>
                         <ThemedText color={color}>{icon}</ThemedText>
-                        <ThemedText> {buildSummary(parts)}</ThemedText>
+                        <ThemedText> {buildSummary(parts, toolVerbs)}</ThemedText>
                     </ThemedText>
                     {hint && (
                         <ThemedText color="textDim">
@@ -126,14 +133,9 @@ export const ToolCallGroup = React.memo(function ToolCallGroup({ parts, expanded
         <Box paddingLeft={1} marginBottom={1}>
             <ThemedText>
                 <ThemedText color={color}>{icon}</ThemedText>
-                <ThemedText> {buildSummary(parts)}</ThemedText>
-                {errorCount > 0 && (
-                    <ThemedText color="error">
-                        {' '}
-                        ({errorCount} error{errorCount > 1 ? 's' : ''})
-                    </ThemedText>
-                )}
-                <ThemedText color="textDim"> (Ctrl+O to expand)</ThemedText>
+                <ThemedText> {buildSummary(parts, toolVerbs)}</ThemedText>
+                {errorCount > 0 && <ThemedText color="error"> {t('tool.group.errorCount', { count: errorCount, s: errorCount > 1 ? 's' : '' })}</ThemedText>}
+                <ThemedText color="textDim"> {t('tool.group.expandHint')}</ThemedText>
             </ThemedText>
         </Box>
     );

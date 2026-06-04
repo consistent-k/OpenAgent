@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import { Box } from 'ink';
 import React from 'react';
 import { Markdown } from '../text/Markdown';
@@ -13,7 +14,7 @@ export const ReasoningPart = React.memo(function ReasoningPart({ text, state, sh
     const isStreaming = state === 'streaming';
 
     if (!showReasoning) {
-        const label = isStreaming ? 'Thinking\u2026' : 'Completed thinking';
+        const label = isStreaming ? t('ui.reasoning.thinking') : t('ui.reasoning.completedThinking');
         return (
             <Box marginBottom={1} paddingLeft={1}>
                 <ThemedText color="textDim" italic>
@@ -27,7 +28,8 @@ export const ReasoningPart = React.memo(function ReasoningPart({ text, state, sh
     return (
         <Box marginBottom={1} paddingLeft={1} flexDirection="column">
             <ThemedText color="textDim" italic>
-                {'\u2234'} Thinking{isStreaming ? '\u2026' : ''}
+                {'\u2234'} {t('ui.reasoning.thinkingLabel')}
+                {isStreaming ? '\u2026' : ''}
             </ThemedText>
             <Box paddingLeft={2}>
                 <Markdown text={text} dimColor />

@@ -1,4 +1,5 @@
 import { useChat } from '@ai-sdk/react';
+import { t } from '@oagent/i18n';
 import type { ModelMessage, UIMessage, UIMessageChunk, DynamicToolUIPart, ToolUIPart, ChatTransport } from 'ai';
 import { convertToModelMessages, getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -137,7 +138,7 @@ function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableSt
                     controller.enqueue({
                         type: 'tool-output-error',
                         toolCallId,
-                        errorText: '(stream interrupted — tool result not received)',
+                        errorText: t('error.streamInterrupted'),
                         dynamic: info.dynamic
                     } as UIMessageChunk);
                 }
@@ -233,7 +234,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
                     {
                         id: uid(),
                         role: 'assistant',
-                        parts: [{ type: 'text', text: '⚠️ 配置未完善，请先输入 /config 配置 baseUrl、apiKey、model' }]
+                        parts: [{ type: 'text', text: t('error.configNotReady') }]
                     }
                 ]);
                 return;
@@ -270,7 +271,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
     }, [pendingApproval, addToolApprovalResponse]);
 
     const denyPendingTool = useCallback(
-        async (reason = '用户拒绝执行该工具') => {
+        async (reason = t('error.userDeniedTool')) => {
             if (!pendingApproval) return;
             try {
                 await addToolApprovalResponse({

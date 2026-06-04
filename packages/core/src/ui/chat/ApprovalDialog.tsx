@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import React, { useEffect, useState } from 'react';
@@ -7,9 +8,9 @@ import { Dialog } from '../text/Dialog';
 import { ListItem } from '../text/ListItem';
 import { Pane } from '../text/Pane';
 
-const APPROVAL_OPTIONS = ['批准执行', '始终批准此类操作', '拒绝'] as const;
-
-const CUSTOM_INPUT_LABEL = '✏️ 自定义输入...';
+function getApprovalOptions() {
+    return [t('ui.approval.approve'), t('ui.approval.alwaysApprove'), t('ui.approval.deny')] as const;
+}
 
 function isAskUserQuestion(pending: PendingToolApproval): boolean {
     return pending.toolName === 'ask_user_question';
@@ -46,7 +47,7 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
     const questionText = isQuestion ? extractQuestionText(pending.input) : '';
 
     // All selectable items: options + custom input entry
-    const allItems = isQuestion ? [...questionOptions, CUSTOM_INPUT_LABEL] : [];
+    const allItems = isQuestion ? [...questionOptions, t('ui.approval.customInput')] : [];
 
     useEffect(() => {
         setIndex(0);
@@ -54,7 +55,8 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
         setCustomText('');
     }, [pending]);
 
-    const maxIndex = isQuestion ? allItems.length - 1 : APPROVAL_OPTIONS.length - 1;
+    const approvalOptions = getApprovalOptions();
+    const maxIndex = isQuestion ? allItems.length - 1 : approvalOptions.length - 1;
 
     useInput(
         (_input, key) => {
@@ -83,7 +85,7 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
                         <Text bold color="suggestion">
                             {questionText || `${pending.toolName}(${summarizeArgs(pending.input)})`}
                         </Text>
-                        <Text dimColor>输入自定义回答，Enter 确认</Text>
+                        <Text dimColor>{t('ui.approval.customInputHint')}</Text>
                     </Box>
                     <Box>
                         <Text color="suggestion">{'❯ '}</Text>
@@ -91,7 +93,7 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
                     </Box>
                     <Box marginTop={1}>
                         <Text dimColor italic>
-                            Enter 确认 · Esc 返回
+                            {t('ui.approval.enterConfirmEscBack')}
                         </Text>
                     </Box>
                 </Box>
@@ -104,7 +106,7 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
         return (
             <Dialog
                 title={questionText || `${pending.toolName}(${summarizeArgs(pending.input)})`}
-                subtitle="↑/↓ 选择，Enter 确认"
+                subtitle={t('ui.approval.selectConfirm')}
                 onConfirm={() => {
                     if (index < questionOptions.length) {
                         onSelectOption(questionOptions[index]!);
@@ -112,7 +114,7 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
                         setCustomInputMode(true);
                     }
                 }}
-                onCancel={() => onDeny('用户未选择')}
+                onCancel={() => onDeny(t('ui.approval.userCancelled'))}
             >
                 {allItems.map((label, i) => (
                     <ListItem isFocused={i === index} key={i}>
@@ -127,7 +129,7 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
     return (
         <Dialog
             title={`${pending.toolName}(${summarizeArgs(pending.input)})`}
-            subtitle="↑/↓ 选择，Enter 确认"
+            subtitle={t('ui.approval.selectConfirm')}
             onConfirm={() => {
                 if (index === 0) onApprove();
                 else if (index === 1) onAlwaysApprove();
@@ -135,7 +137,7 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
             }}
             onCancel={() => onDeny()}
         >
-            {APPROVAL_OPTIONS.map((label, i) => (
+            {approvalOptions.map((label, i) => (
                 <ListItem isFocused={i === index} key={label}>
                     {label}
                 </ListItem>

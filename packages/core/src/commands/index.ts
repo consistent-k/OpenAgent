@@ -5,6 +5,7 @@ import { clearCommand } from './clear';
 import { configCommand } from './config';
 import { exitCommand } from './exit';
 import { helpCommand } from './help';
+import { localeCommand } from './locale';
 import type { SlashCommand } from './registry';
 import { reloadCommand } from './reload';
 import { sessionsCommand } from './sessions';
@@ -21,6 +22,7 @@ export const COMMANDS: SlashCommand[] = [
     themeCommand,
     toolsCommand,
     channelCommand,
+    localeCommand,
     reloadCommand,
     cancelCommand,
     sessionsCommand,

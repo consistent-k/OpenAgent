@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import { tool } from 'ai';
 import axios from 'axios';
 import { z } from 'zod';
@@ -40,7 +41,7 @@ async function searchViaApi(query: string, maxResults: number): Promise<{ result
     const apiKey = process.env.OPENAGENT_SEARCH_API_KEY;
 
     if (!apiUrl) {
-        throw new Error('Search API not configured');
+        throw new Error(t('tool.webSearch.apiNotConfigured'));
     }
 
     const response = await axios.get(apiUrl, {
@@ -75,7 +76,7 @@ async function searchViaApi(query: string, maxResults: number): Promise<{ result
         };
     }
 
-    throw new Error('Unable to parse search API response format');
+    throw new Error(t('tool.webSearch.parseError'));
 }
 
 async function searchViaDuckDuckGo(query: string, maxResults: number): Promise<{ results: SearchResult[]; provider: string }> {
@@ -121,7 +122,7 @@ export const webSearchTool = tool({
                     query,
                     results: [],
                     provider: result.provider,
-                    message: 'No results found'
+                    message: t('tool.webSearch.noResults')
                 };
             }
 
@@ -131,7 +132,7 @@ export const webSearchTool = tool({
                 provider: result.provider
             };
         } catch (error) {
-            throw new Error(`Search failed: ${getErrorMessage(error)}`);
+            throw new Error(t('tool.webSearch.searchFailed', { error: getErrorMessage(error) }));
         }
     }
 });

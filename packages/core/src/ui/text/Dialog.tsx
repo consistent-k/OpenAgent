@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import { Box, Text, useInput } from 'ink';
 import React, { useCallback } from 'react';
 import { Byline } from './Byline';
@@ -42,8 +43,8 @@ export function Dialog({ title, subtitle, children, onConfirm, onCancel, color =
                 <Box marginTop={1}>
                     <Text dimColor italic>
                         <Byline>
-                            {onConfirm && <KeyboardShortcutHint shortcut="Enter" action="confirm" />}
-                            <KeyboardShortcutHint shortcut="Esc" action="cancel" />
+                            {onConfirm && <KeyboardShortcutHint shortcut={t('ui.dialog.enter')} action={t('ui.dialog.confirm')} />}
+                            <KeyboardShortcutHint shortcut={t('ui.dialog.esc')} action={t('ui.dialog.cancel')} />
                         </Byline>
                     </Text>
                 </Box>

@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { t } from '@oagent/i18n';
 
 const PKG_NAME = '@oagent/oa';
 
@@ -81,7 +82,7 @@ export async function runUpdate(): Promise<UpdateResult> {
     if (!pm) {
         return {
             success: false,
-            message: `❌ 未检测到全局安装的 ${PKG_NAME}，请先通过 npm install -g ${PKG_NAME} 安装。`
+            message: t('update.notInstalled', { pkgName: PKG_NAME })
         };
     }
 
@@ -89,7 +90,7 @@ export async function runUpdate(): Promise<UpdateResult> {
     const latest = getLatestVersion();
 
     if (current && latest && current === latest) {
-        return { success: true, message: `✅ 已是最新版本 v${current}` };
+        return { success: true, message: t('update.alreadyLatest', { version: current }) };
     }
 
     try {
@@ -107,11 +108,11 @@ export async function runUpdate(): Promise<UpdateResult> {
         const newVersion = getCurrentVersion(pm);
         return {
             success: true,
-            message: `✅ 更新完成！v${current ?? '?'} → v${newVersion ?? '?'}\n请重启 oa 以使用新版本。${output ? `\n\n${output}` : ''}`
+            message: `${t('update.success', { current: current ?? '?', newVersion: newVersion ?? '?' })}${output ? `\n\n${output}` : ''}`
         };
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { success: false, message: `❌ 更新失败：${msg}` };
+        return { success: false, message: t('update.failed', { error: msg }) };
     }
 }
 

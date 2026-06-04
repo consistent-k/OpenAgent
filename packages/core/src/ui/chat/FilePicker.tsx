@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import React from 'react';
 import type { FileEntry } from '../../utils/files';
 import { ListItem } from '../text/ListItem';
@@ -14,7 +15,7 @@ export function FilePicker({ entries, selectedIndex, query }: FilePickerProps) {
         return (
             <ThemedBox borderColor="border" paddingX={1}>
                 <ListItem isFocused={false} disabled>
-                    {query ? `无匹配文件: ${query}` : '(空)'}
+                    {query ? t('ui.filePicker.noMatch', { query }) : t('ui.filePicker.empty')}
                 </ListItem>
             </ThemedBox>
         );

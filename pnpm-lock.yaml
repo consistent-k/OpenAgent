@@ -94,6 +94,9 @@ importers:
       '@oagent/channels':
         specifier: workspace:*
         version: link:../channels
+      '@oagent/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       ai:
         specifier: ^6.0.195
         version: 6.0.195(zod@4.4.3)
@@ -137,6 +140,15 @@ importers:
       '@types/react':
         specifier: ^19.2.16
         version: 19.2.16
+
+  packages/i18n:
+    devDependencies:
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^6.0.0
+        version: 6.0.3
 
   packages/telegram:
     dependencies:

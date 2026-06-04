@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { t } from '@oagent/i18n';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { MAX_FILE_SIZE } from '@/config';
@@ -14,16 +15,16 @@ export const readFileTool = tool({
     }),
     execute: async ({ path: filePath, startLine, endLine }) => {
         if (startLine !== undefined && endLine !== undefined && endLine < startLine) {
-            throw new Error('endLine must be >= startLine');
+            throw new Error(t('tool.readFile.invalidRange'));
         }
 
         const resolved = resolveReadPath(filePath);
         const stat = await fs.stat(resolved);
         if (!stat.isFile()) {
-            throw new Error(`Path is not a file: ${filePath}`);
+            throw new Error(t('tool.readFile.notAFile', { filePath }));
         }
         if (stat.size > MAX_FILE_SIZE) {
-            throw new Error(`File too large (${Math.round(stat.size / 1024)}KB), exceeds ${MAX_FILE_SIZE / 1024}KB limit`);
+            throw new Error(t('tool.readFile.fileTooLarge', { size: Math.round(stat.size / 1024), limit: MAX_FILE_SIZE / 1024 }));
         }
 
         const content = await fs.readFile(resolved, 'utf-8');

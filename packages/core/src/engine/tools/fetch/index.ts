@@ -1,5 +1,6 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
+import { t } from '@oagent/i18n';
 import { tool } from 'ai';
 import axios from 'axios';
 import { z } from 'zod';
@@ -27,23 +28,23 @@ function isBlockedAddress(address: string): boolean {
 async function assertPublicHttpUrl(url: string): Promise<void> {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        throw new Error('Only http and https URLs are supported');
+        throw new Error(t('tool.fetch.unsupportedProtocol'));
     }
 
     if (parsed.hostname === 'localhost' || parsed.hostname.endsWith('.localhost')) {
-        throw new Error('Requests to localhost are not allowed');
+        throw new Error(t('tool.fetch.localhostBlocked'));
     }
 
     if (net.isIP(parsed.hostname)) {
         if (isBlockedAddress(parsed.hostname)) {
-            throw new Error('Requests to private/loopback addresses are not allowed');
+            throw new Error(t('tool.fetch.privateAddressBlocked'));
         }
         return;
     }
 
     const addresses = await dns.lookup(parsed.hostname, { all: true });
     if (addresses.some(({ address }) => isBlockedAddress(address))) {
-        throw new Error('Hostname resolves to a private/loopback address');
+        throw new Error(t('tool.fetch.resolvesToPrivate'));
     }
 }
 
@@ -118,9 +119,9 @@ export const fetchTool = tool({
             return result;
         } catch (error) {
             if (axios.isAxiosError(error)) {
-                throw new Error(`Failed to fetch URL: ${error.message}`);
+                throw new Error(t('tool.fetch.fetchFailed', { error: error.message }));
             }
-            throw new Error(`Failed to fetch URL: ${getErrorMessage(error)}`);
+            throw new Error(t('tool.fetch.fetchFailed', { error: getErrorMessage(error) }));
         }
     }
 });

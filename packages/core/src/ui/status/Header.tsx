@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import { Box, Text } from 'ink';
 import React from 'react';
 import { APP_NAME, getModelName } from '../../config';
@@ -38,22 +39,22 @@ interface HeaderProps {
 }
 
 function fileIndexText(status: FileIndexStatus, count: number): { text: string; icon: 'loading' | 'error' | 'info' } {
-    if (status === 'indexing') return { text: 'indexing...', icon: 'loading' };
-    if (status === 'error') return { text: 'index error', icon: 'error' };
-    return { text: `${count} files`, icon: 'info' };
+    if (status === 'indexing') return { text: t('status.header.indexing'), icon: 'loading' };
+    if (status === 'error') return { text: t('status.header.indexError'), icon: 'error' };
+    return { text: t('status.header.fileCount', { count }), icon: 'info' };
 }
 
 function safeModelName(): string {
-    return getModelName() || '未配置';
+    return getModelName() || t('status.header.notConfigured');
 }
 
 export function Header({ status, fileIndexStatus, fileIndexCount, pendingApproval }: HeaderProps) {
     const { themeName } = useTheme();
     const runState = pendingApproval
-        ? { text: 'awaiting approval', icon: 'warning' as const }
+        ? { text: t('status.header.awaitingApproval'), icon: 'warning' as const }
         : status === 'streaming'
-          ? { text: 'streaming...', icon: 'loading' as const }
-          : { text: 'idle', icon: 'info' as const };
+          ? { text: t('status.header.streaming'), icon: 'loading' as const }
+          : { text: t('status.header.idle'), icon: 'info' as const };
 
     const indexInfo = fileIndexText(fileIndexStatus, fileIndexCount);
 
@@ -67,7 +68,7 @@ export function Header({ status, fileIndexStatus, fileIndexCount, pendingApprova
                     {themeName === 'mayday' && <MaydayBalls />}
                 </Box>
                 <Box>
-                    <ThemedText color="textDim">model: </ThemedText>
+                    <ThemedText color="textDim">{t('status.header.modelLabel')}</ThemedText>
                     <ThemedText color="accent">{safeModelName()}</ThemedText>
                     <ThemedText color="subtle"> | </ThemedText>
                     <StatusIcon status={indexInfo.icon} />

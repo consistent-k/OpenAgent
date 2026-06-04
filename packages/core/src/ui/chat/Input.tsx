@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import { Box, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -167,7 +168,7 @@ export function Input({
             <Box flexDirection="column">
                 <ThemedBox borderColor="border" paddingX={1}>
                     <ThemedText color="textDim">{'> '}</ThemedText>
-                    <ThemedText color="textDim">{value || '(AI 正在回复，按 Esc 或 Ctrl+C 停止…)'}</ThemedText>
+                    <ThemedText color="textDim">{value || t('ui.input.aiResponding')}</ThemedText>
                 </ThemedBox>
                 <Divider color="border" />
             </Box>

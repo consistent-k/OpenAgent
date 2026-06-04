@@ -1,15 +1,16 @@
+import { t } from '@oagent/i18n';
 import { uid } from '../utils/uid';
 import type { SlashCommand } from './registry';
 
 export const reloadCommand: SlashCommand = {
     name: '/reload',
-    description: '重新扫描工作目录，刷新 @文件 补全索引',
+    getDescription: () => t('command.reload.description'),
     run: async ({ rawInput, appendMessages, reloadFileIndex }) => {
         appendMessages([
             { id: uid(), role: 'user', parts: [{ type: 'text', text: rawInput }] },
-            { id: uid(), role: 'assistant', parts: [{ type: 'text', text: '正在刷新文件索引...', state: 'done' }] }
+            { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('command.reload.refreshing'), state: 'done' }] }
         ]);
         const count = await reloadFileIndex();
-        appendMessages([{ id: uid(), role: 'assistant', parts: [{ type: 'text', text: `文件索引已刷新：${count} 项`, state: 'done' }] }]);
+        appendMessages([{ id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('command.reload.refreshed', { count }), state: 'done' }] }]);
     }
 };

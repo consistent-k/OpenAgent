@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import type { DynamicToolUIPart, ToolUIPart } from 'ai';
 import { getToolName } from 'ai';
 import { Box } from 'ink';
@@ -12,15 +13,17 @@ interface ToolCallPartProps {
     part: AnyToolPart;
 }
 
-const TOOL_STATES: Record<string, { icon: string; color: StringThemeKeys; label: string }> = {
-    'input-streaming': { icon: '···', color: 'accent', label: 'waiting input' },
-    'input-available': { icon: '○', color: 'accent', label: 'pending' },
-    'approval-requested': { icon: '◔', color: 'warning', label: 'awaiting approval' },
-    'approval-responded': { icon: '◉', color: 'success', label: 'executing' },
-    'output-available': { icon: '●', color: 'success', label: '' },
-    'output-error': { icon: '▲', color: 'error', label: 'error' },
-    'output-denied': { icon: '▲', color: 'error', label: 'denied' }
-};
+function getToolStates(): Record<string, { icon: string; color: StringThemeKeys; label: string }> {
+    return {
+        'input-streaming': { icon: '···', color: 'accent', label: t('tool.state.waitingInput') },
+        'input-available': { icon: '○', color: 'accent', label: t('tool.state.pending') },
+        'approval-requested': { icon: '◔', color: 'warning', label: t('tool.state.awaitingApproval') },
+        'approval-responded': { icon: '◉', color: 'success', label: t('tool.state.executing') },
+        'output-available': { icon: '●', color: 'success', label: '' },
+        'output-error': { icon: '▲', color: 'error', label: t('tool.state.error') },
+        'output-denied': { icon: '▲', color: 'error', label: t('tool.state.denied') }
+    };
+}
 
 const MAX_PREVIEW_LINES = 3;
 
@@ -28,13 +31,13 @@ function getResultLines(part: AnyToolPart): string[] {
     let raw = '';
     switch (part.state) {
         case 'output-available':
-            raw = typeof part.output === 'string' ? part.output : '✓';
+            raw = typeof part.output === 'string' ? part.output : t('tool.result.checkmark');
             break;
         case 'output-error':
             raw = part.errorText;
             break;
         case 'output-denied':
-            raw = part.approval?.reason || 'denied';
+            raw = part.approval?.reason || t('tool.result.denied');
             break;
         default:
             return [];
@@ -43,7 +46,8 @@ function getResultLines(part: AnyToolPart): string[] {
 }
 
 export const ToolCallPart = React.memo(function ToolCallPart({ part }: ToolCallPartProps) {
-    const meta = TOOL_STATES[part.state] ?? { icon: '○', color: 'inactive', label: '' };
+    const toolStates = getToolStates();
+    const meta = toolStates[part.state] ?? { icon: '○', color: 'inactive', label: '' };
     const head = `${getToolName(part)}(${summarizeArgs(part.input)})`;
     const isTerminal = part.state === 'output-available' || part.state === 'output-error' || part.state === 'output-denied';
     const lines = isTerminal ? getResultLines(part) : [];
@@ -72,7 +76,7 @@ export const ToolCallPart = React.memo(function ToolCallPart({ part }: ToolCallP
                             {line}
                         </ThemedText>
                     ))}
-                    {hasMore && <ThemedText color="textDim">... ({lines.length - MAX_PREVIEW_LINES} more lines)</ThemedText>}
+                    {hasMore && <ThemedText color="textDim">{t('tool.result.moreLines', { count: lines.length - MAX_PREVIEW_LINES })}</ThemedText>}
                 </Box>
             )}
         </Box>

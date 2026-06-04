@@ -14,6 +14,7 @@
  */
 import path from 'node:path';
 import { channelManager } from '@oagent/channels';
+import { t } from '@oagent/i18n';
 import { getConfiguredChannels } from '../config';
 import { runAgent } from '../engine';
 import { ApprovalStore, APPROVABLE_TOOLS, withStore, APPROVALS_DIR } from '../engine/tools/utils/approval-store';
@@ -48,13 +49,13 @@ async function ensurePlugins(): Promise<void> {
                 mod = await import(localPath);
             }
             if (typeof mod.register !== 'function') {
-                loadError = `包 "${pkgName}" 没有导出 register 函数`;
+                loadError = t('command.channel.pluginNoRegister', { pkgName });
                 continue;
             }
             // 调用插件的 register，注入 runAgent
             mod.register(channelManager, { runAgent });
         } catch (err) {
-            loadError = `加载 channel 插件 "${pkgName}" 失败: ${err instanceof Error ? err.message : String(err)}`;
+            loadError = t('command.channel.pluginLoadFailed', { pkgName, err: err instanceof Error ? err.message : String(err) });
         }
     }
 }
@@ -65,7 +66,7 @@ async function ensurePlugins(): Promise<void> {
 
 export const channelCommand: SlashCommand = {
     name: '/channel',
-    description: '管理消息渠道（start/stop/login/status）',
+    getDescription: () => t('command.channel.description'),
     run: async ({ rawInput, args, appendMessages }) => {
         await ensurePlugins();
 
@@ -82,26 +83,26 @@ export const channelCommand: SlashCommand = {
         switch (sub) {
             case 'start': {
                 if (!target) {
-                    lines.push('❌ 请指定 channel，如: /channel start weixin');
+                    lines.push(t('command.channel.specifyChannel', { verb: 'start' }));
                     break;
                 }
                 const channel = channelManager.get(target);
                 if (!channel) {
-                    lines.push(`❌ 未知 channel: ${target}`);
+                    lines.push(t('command.channel.unknownChannel', { target }));
                     const available = channelManager.list().map((c) => c.id);
                     if (available.length > 0) {
-                        lines.push(`可用: ${available.join(', ')}`);
+                        lines.push(t('command.channel.available', { available: available.join(', ') }));
                     } else {
-                        lines.push('无已注册的 channel，请在 config.json 中配置 channels');
+                        lines.push(t('command.channel.noRegistered'));
                     }
                     break;
                 }
                 if (channelManager.isRunning(target)) {
-                    lines.push(`⚠️ ${channel.name} 已在运行中`);
+                    lines.push(t('command.channel.alreadyRunning', { name: channel.name }));
                     break;
                 }
                 if (!channel.isConfigured()) {
-                    lines.push(`❌ ${channel.name} 未配置`);
+                    lines.push(t('command.channel.notConfigured', { name: channel.name }));
                     lines.push(...channel.getStatusInfo());
                     break;
                 }
@@ -111,9 +112,9 @@ export const channelCommand: SlashCommand = {
                 channelStore.setToolApprovals(Array.from(APPROVABLE_TOOLS, (tool) => ({ toolName: tool, approved: true })));
 
                 // 显示启动消息
-                lines.push(`🤖 ${channel.name} 启动中...`);
+                lines.push(t('command.channel.starting', { name: channel.name }));
                 lines.push(...channel.getStatusInfo());
-                lines.push(`使用 /channel stop ${target} 停止`);
+                lines.push(t('command.channel.stopHint', { target }));
 
                 appendMessages([
                     { id: uid(), role: 'user', parts: [{ type: 'text', text: rawInput }] },
@@ -138,7 +139,7 @@ export const channelCommand: SlashCommand = {
                                 {
                                     id: uid(),
                                     role: 'assistant',
-                                    parts: [{ type: 'text', text: `⏹️ ${channel.name} 已停止`, state: 'done' }]
+                                    parts: [{ type: 'text', text: t('command.channel.stopped', { name: channel.name }), state: 'done' }]
                                 }
                             ]);
                         })
@@ -147,7 +148,7 @@ export const channelCommand: SlashCommand = {
                                 {
                                     id: uid(),
                                     role: 'assistant',
-                                    parts: [{ type: 'text', text: `❌ ${channel.name} 异常退出: ${err}`, state: 'done' }]
+                                    parts: [{ type: 'text', text: t('command.channel.exitedWithError', { name: channel.name, err: String(err) }), state: 'done' }]
                                 }
                             ]);
                         })
@@ -158,38 +159,38 @@ export const channelCommand: SlashCommand = {
             case 'stop': {
                 if (target === 'all') {
                     await channelManager.stopAll();
-                    lines.push('⏹️ 所有 channel 已停止');
+                    lines.push(t('command.channel.allStopped'));
                     break;
                 }
                 if (!target) {
-                    lines.push('❌ 请指定 channel，如: /channel stop weixin');
+                    lines.push(t('command.channel.specifyChannel', { verb: 'stop' }));
                     break;
                 }
                 if (!channelManager.isRunning(target)) {
-                    lines.push(`⚠️ ${target} 未在运行`);
+                    lines.push(t('command.channel.notRunning', { target }));
                     break;
                 }
                 await channelManager.stop(target);
-                lines.push(`⏹️ ${target} 已停止`);
+                lines.push(t('command.channel.channelStopped', { target }));
                 break;
             }
 
             case 'login': {
                 if (!target) {
-                    lines.push('❌ 请指定 channel，如: /channel login weixin');
+                    lines.push(t('command.channel.specifyChannel', { verb: 'login' }));
                     break;
                 }
                 const channel = channelManager.get(target);
                 if (!channel) {
-                    lines.push(`❌ 未知 channel: ${target}`);
+                    lines.push(t('command.channel.unknownChannel', { target }));
                     break;
                 }
                 if (channelManager.isRunning(target)) {
-                    lines.push(`⚠️ ${channel.name} 正在运行中，请先 /channel stop ${target}`);
+                    lines.push(t('command.channel.runningStopFirst', { name: channel.name, target }));
                     break;
                 }
                 if (!channel.login) {
-                    lines.push(`❌ ${channel.name} 不支持 login 命令`);
+                    lines.push(t('command.channel.loginNotSupported', { name: channel.name }));
                     break;
                 }
 
@@ -203,7 +204,9 @@ export const channelCommand: SlashCommand = {
                             appendMessages([{ id: uid(), role: 'assistant', parts: [{ type: 'text', text: resultLines.join('\n'), state: 'done' }] }]);
                         })
                         .catch((err: unknown) => {
-                            appendMessages([{ id: uid(), role: 'assistant', parts: [{ type: 'text', text: `❌ ${channel.name} 配置失败: ${err}`, state: 'done' }] }]);
+                            appendMessages([
+                                { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('command.channel.configFailed', { name: channel.name, err: String(err) }), state: 'done' }] }
+                            ]);
                         });
                     return;
                 }
@@ -220,27 +223,27 @@ export const channelCommand: SlashCommand = {
                         appendMessages([{ id: uid(), role: 'assistant', parts: [{ type: 'text', text: resultLines.join('\n'), state: 'done' }] }]);
                     })
                     .catch((err) => {
-                        appendMessages([{ id: uid(), role: 'assistant', parts: [{ type: 'text', text: `❌ ${channel.name} 登录失败: ${err}`, state: 'done' }] }]);
+                        appendMessages([{ id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('command.channel.loginFailed', { name: channel.name, err: String(err) }), state: 'done' }] }]);
                     });
                 return;
             }
 
             case 'logout': {
                 if (!target) {
-                    lines.push('❌ 请指定 channel，如: /channel logout weixin');
+                    lines.push(t('command.channel.specifyChannel', { verb: 'logout' }));
                     break;
                 }
                 const channel = channelManager.get(target);
                 if (!channel) {
-                    lines.push(`❌ 未知 channel: ${target}`);
+                    lines.push(t('command.channel.unknownChannel', { target }));
                     break;
                 }
                 if (channelManager.isRunning(target)) {
-                    lines.push(`⚠️ ${channel.name} 正在运行中，请先 /channel stop ${target}`);
+                    lines.push(t('command.channel.runningStopFirst', { name: channel.name, target }));
                     break;
                 }
                 if (!channel.logout) {
-                    lines.push(`❌ ${channel.name} 不支持 logout 命令`);
+                    lines.push(t('command.channel.logoutNotSupported', { name: channel.name }));
                     break;
                 }
 
@@ -255,21 +258,21 @@ export const channelCommand: SlashCommand = {
                 if (channels.length === 0) {
                     const configured = getConfiguredChannels();
                     if (configured.length === 0) {
-                        lines.push('📭 未配置任何 channel 插件');
-                        lines.push('在 config.json 中添加:');
+                        lines.push(t('command.channel.noPluginsConfigured'));
+                        lines.push(t('command.channel.addInConfig'));
                         lines.push('  { "channels": ["@oagent/weixin"] }');
                     } else {
-                        lines.push(`📭 已配置但未加载: ${configured.join(', ')}`);
-                        lines.push('请确保已安装对应的 npm 包');
+                        lines.push(t('command.channel.configuredNotLoaded', { configured: configured.join(', ') }));
+                        lines.push(t('command.channel.ensureInstalled'));
                     }
                     break;
                 }
 
-                lines.push('📡 Channel 状态\n');
+                lines.push(t('command.channel.statusHeader'));
                 for (const ch of channels) {
                     const running = channelManager.isRunning(ch.id);
                     const icon = running ? '🟢' : ch.isConfigured() ? '⚪' : '🔴';
-                    const statusText = running ? '运行中' : ch.isConfigured() ? '已就绪' : '未配置';
+                    const statusText = running ? t('command.channel.statusRunning') : ch.isConfigured() ? t('command.channel.statusReady') : t('command.channel.statusUnconfigured');
                     lines.push(`${icon} ${ch.name} (${ch.id}) — ${statusText}`);
                     for (const info of ch.getStatusInfo()) {
                         lines.push(`   ${info}`);
@@ -278,15 +281,15 @@ export const channelCommand: SlashCommand = {
                         const uptime = channelManager.getUptime(ch.id);
                         const min = Math.floor(uptime / 60_000);
                         const sec = Math.floor((uptime % 60_000) / 1000);
-                        lines.push(`   运行时长: ${min}m ${sec}s`);
+                        lines.push(t('command.channel.uptime', { min, sec }));
                     }
                     lines.push('');
                 }
 
-                lines.push('命令:');
-                lines.push('  /channel start <id>    启动');
-                lines.push('  /channel stop <id>     停止');
-                lines.push('  /channel stop all      停止所有');
+                lines.push(t('command.channel.commands'));
+                lines.push(t('command.channel.helpStart'));
+                lines.push(t('command.channel.helpStop'));
+                lines.push(t('command.channel.helpStopAll'));
             }
         }
 

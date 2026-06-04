@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { t } from '@oagent/i18n';
 import { Command } from 'commander';
 import { runUpdate } from './utils/update';
 
@@ -14,11 +15,11 @@ function getVersion(): string {
     }
 }
 
-export const program = new Command().name('oa').description('OpenAgent - 终端 AI Agent 客户端').version(getVersion());
+export const program = new Command().name('oa').description(t('cli.description')).version(getVersion());
 
 program
     .command('update')
-    .description('通过 npm/pnpm/yarn 全局更新 oa 至最新版本')
+    .description(t('cli.updateDescription'))
     .action(async () => {
         const result = await runUpdate();
         console.log(result.message);

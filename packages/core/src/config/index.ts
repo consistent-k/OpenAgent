@@ -1,5 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
+import { setLocale, t } from '@oagent/i18n';
 import { getErrorMessage } from '@/utils/errors';
 import { readJsonFile, writeJsonFile } from '@/utils/fs';
 
@@ -23,6 +24,13 @@ interface OpenAgentConfig {
     maxSteps?: number;
     /** 启用的 channel 插件包名列表，如 ["@oagent/weixin"] */
     channels?: string[];
+    /** 语言配置 */
+    locale?: {
+        /** 当前语言，如 'zh'、'en' */
+        lang?: string;
+        /** 语言扩展包名列表，如 ["@oagent/locale-ja"] */
+        plugins?: string[];
+    };
 }
 
 const DEFAULT_CONFIG: OpenAgentConfig = {
@@ -69,7 +77,7 @@ function readConfig(): OpenAgentConfig {
             cachedConfig = envConfig;
             return cachedConfig;
         }
-        throw new Error(`读取配置文件失败：${CONFIG_PATH}\n${getErrorMessage(error)}`);
+        throw new Error(t('error.config.readFailed', { path: CONFIG_PATH, error: getErrorMessage(error) }));
     }
 }
 
@@ -103,7 +111,7 @@ export function getMaxSteps(): number {
     const value = readConfig().maxSteps;
     if (value === undefined) return DEFAULT_MAX_STEPS;
     if (!Number.isInteger(value) || value < 1 || value > 20) {
-        throw new Error(`配置字段 maxSteps 必须是 1 到 20 之间的整数`);
+        throw new Error(t('error.config.invalidMaxSteps'));
     }
     return value;
 }
@@ -113,20 +121,37 @@ export function getConfiguredChannels(): string[] {
     return readConfig().channels ?? [];
 }
 
-export function getConfigSummary(): { baseUrl: string; model: string; maxSteps: number; apiKey: string } {
+/** 获取配置的语言扩展包列表 */
+export function getConfiguredLocalePlugins(): string[] {
+    return readConfig().locale?.plugins ?? [];
+}
+
+/** 获取配置的语言设置，默认 'zh' */
+export function getConfigLocale(): string {
+    return readConfig().locale?.lang ?? 'zh';
+}
+
+export function getConfigSummary(): { baseUrl: string; model: string; maxSteps: number; apiKey: string; locale: string } {
     const apiKey = getApiKey();
     const maskedApiKey = apiKey ? (apiKey.length <= 8 ? '****' : `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}`) : '';
     return {
         baseUrl: getBaseUrl(),
         model: getModelName(),
         maxSteps: getMaxSteps(),
-        apiKey: maskedApiKey
+        apiKey: maskedApiKey,
+        locale: getConfigLocale()
     };
 }
 
-export function saveConfig(updates: Partial<OpenAgentConfig>): void {
+export function saveConfig(updates: Partial<OpenAgentConfig> & { locale?: string }): void {
     const current = readConfig();
-    const merged = { ...current, ...updates };
+    // 兼容：当 locale 为字符串时，写入 locale.lang
+    const { locale, ...rest } = updates;
+    const merged: OpenAgentConfig = { ...current, ...rest };
+    if (typeof locale === 'string') {
+        merged.locale = { ...current.locale, lang: locale };
+        setLocale(locale);
+    }
     writeJsonFile(CONFIG_PATH, merged);
     cachedConfig = merged;
 }

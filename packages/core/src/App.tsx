@@ -1,9 +1,11 @@
+import { t } from '@oagent/i18n';
 import { Box, Text, useApp, useInput } from 'ink';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { findCommand, COMMANDS, parseCommandInput } from './commands';
 import { getConfigSummary, saveConfig, reloadConfig, isConfigReady, type OpenAgentConfig } from './config';
 import { useChatStream } from './hooks/useChatStream';
 import { useFileIndex } from './hooks/useFileIndex';
+import { useLocaleSetup } from './hooks/useLocaleSetup';
 import type { ConfigItem } from './ui/chat/ConfigPicker';
 import { Input } from './ui/chat/Input';
 import { MessageList } from './ui/messages/MessageList';
@@ -62,6 +64,8 @@ function AppContent() {
         sessionIdRef.current = uid();
     }, []);
 
+    useLocaleSetup();
+
     // 启动时检查配置，未完善则引导用户
     const configChecked = useRef(false);
     useEffect(() => {
@@ -75,15 +79,7 @@ function AppContent() {
                     parts: [
                         {
                             type: 'text',
-                            text: [
-                                '👋 欢迎使用 Open Agent！检测到配置文件尚未完善，请先配置以下必填项：',
-                                '',
-                                '  • baseUrl — API 服务地址',
-                                '  • apiKey  — API 密钥',
-                                '  • model   — 模型名称',
-                                '',
-                                '输入 /config 打开配置编辑器，或手动编辑 ~/.openagent/config.json'
-                            ].join('\n'),
+                            text: [t('app.welcome'), '', t('app.welcome.baseUrl'), t('app.welcome.apiKey'), t('app.welcome.model'), '', t('app.welcome.hint')].join('\n'),
                             state: 'done'
                         }
                     ]
@@ -98,7 +94,8 @@ function AppContent() {
             { key: 'baseUrl', label: 'Base URL', value: config.baseUrl, editable: true },
             { key: 'apiKey', label: 'API Key', value: config.apiKey, editable: true },
             { key: 'model', label: 'Model', value: config.model, editable: true },
-            { key: 'maxSteps', label: 'Max Steps', value: String(config.maxSteps), editable: true }
+            { key: 'maxSteps', label: 'Max Steps', value: String(config.maxSteps), editable: true },
+            { key: 'locale', label: 'Language', value: config.locale, editable: true }
         ];
     }, []);
 
@@ -106,9 +103,11 @@ function AppContent() {
 
     const handleSaveConfig = useCallback(
         (key: string, value: string) => {
-            const updates: Partial<OpenAgentConfig> = {};
+            const updates: Partial<OpenAgentConfig> & { locale?: string } = {};
             if (key === 'maxSteps') {
                 updates.maxSteps = Number(value);
+            } else if (key === 'locale') {
+                updates.locale = value;
             } else {
                 (updates as Record<string, string>)[key] = value;
             }
@@ -120,12 +119,12 @@ function AppContent() {
                 setInputValue('');
                 appendMessages([
                     { id: uid(), role: 'user', parts: [{ type: 'text', text: `/config` }] },
-                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `已更新配置 ${key}：${key === 'apiKey' ? '****' : value}`, state: 'done' }] }
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.configUpdated', { key, value: key === 'apiKey' ? '****' : value }), state: 'done' }] }
                 ]);
             } catch (error) {
                 appendMessages([
                     { id: uid(), role: 'user', parts: [{ type: 'text', text: `/config` }] },
-                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `保存配置失败：${getErrorMessage(error)}`, state: 'done' }] }
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.configSaveFailed', { error: getErrorMessage(error) }), state: 'done' }] }
                 ]);
             }
         },
@@ -185,7 +184,7 @@ function AppContent() {
             setInputValue('');
             appendMessages([
                 { id: uid(), role: 'user', parts: [{ type: 'text', text: `/theme` }] },
-                { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `已切换到主题：${name}`, state: 'done' }] }
+                { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.themeSwitched', { name }), state: 'done' }] }
             ]);
         },
         [setThemeName, appendMessages]
@@ -221,7 +220,7 @@ function AppContent() {
                 if (!cmd) {
                     appendMessages([
                         { id: uid(), role: 'user', parts: [{ type: 'text', text: resolvedInput }] },
-                        { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `未知命令：${resolvedInput}（输入 /help 查看可用命令）`, state: 'done' }] }
+                        { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.unknownCommand', { input: resolvedInput }), state: 'done' }] }
                     ]);
                     return;
                 }
@@ -254,7 +253,7 @@ function AppContent() {
                 } catch (error) {
                     appendMessages([
                         { id: uid(), role: 'user', parts: [{ type: 'text', text: resolvedInput }] },
-                        { id: uid(), role: 'assistant', parts: [{ type: 'text', text: `[命令错误] ${getErrorMessage(error)}`, state: 'done' }] }
+                        { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.commandError', { error: getErrorMessage(error) }), state: 'done' }] }
                     ]);
                 }
                 return;

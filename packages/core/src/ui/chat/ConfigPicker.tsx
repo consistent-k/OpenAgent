@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import React, { useState } from 'react';
@@ -37,8 +38,8 @@ export function ConfigPicker({ items, onSave, onCancel }: ConfigPickerProps) {
     if (editing) {
         return (
             <Dialog
-                title={`编辑 ${editing.label}`}
-                subtitle={`当前值：${editing.value}`}
+                title={t('ui.configPicker.editTitle', { label: editing.label })}
+                subtitle={t('ui.configPicker.currentValue', { value: editing.value })}
                 onConfirm={() => {
                     if (editValue.trim()) {
                         onSave(editing.key, editValue.trim());
@@ -69,8 +70,8 @@ export function ConfigPicker({ items, onSave, onCancel }: ConfigPickerProps) {
 
     return (
         <Dialog
-            title="配置管理"
-            subtitle="↑/↓ 选择，Enter 编辑"
+            title={t('ui.configPicker.title')}
+            subtitle={t('ui.configPicker.subtitle')}
             onConfirm={
                 focusedItem.editable
                     ? () => {
@@ -82,7 +83,12 @@ export function ConfigPicker({ items, onSave, onCancel }: ConfigPickerProps) {
             onCancel={onCancel}
         >
             {items.map((item, i) => (
-                <ListItem key={item.key} isFocused={i === index} disabled={!item.editable} description={item.editable ? `当前：${item.value}` : `当前：${item.value}（不可编辑）`}>
+                <ListItem
+                    key={item.key}
+                    isFocused={i === index}
+                    disabled={!item.editable}
+                    description={item.editable ? t('ui.configPicker.currentValueShort', { value: item.value }) : t('ui.configPicker.currentValueNotEditable', { value: item.value })}
+                >
                     {item.label}
                 </ListItem>
             ))}

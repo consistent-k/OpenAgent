@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { t } from '@oagent/i18n';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { MAX_FILE_SIZE } from '@/config';
@@ -86,7 +87,7 @@ export const grepTool = tool({
         try {
             regex = new RegExp(pattern, flags);
         } catch (error) {
-            throw new Error(`Invalid regex pattern: ${getErrorMessage(error)}`);
+            throw new Error(t('tool.grep.invalidRegex', { error: getErrorMessage(error) }));
         }
 
         async function loadLines(filePath: string): Promise<string[] | null> {
@@ -140,7 +141,7 @@ export const grepTool = tool({
 
         if (stat.isFile()) {
             const lines = await loadLines(resolved);
-            if (!lines) throw new Error(`Cannot read file: ${searchPath}`);
+            if (!lines) throw new Error(t('tool.grep.cannotReadFile', { path: searchPath }));
 
             const matches = await searchFileLines(resolved, regex, context, lines);
 
@@ -174,6 +175,6 @@ export const grepTool = tool({
             return { path: searchPath, pattern, results, totalMatches, truncated: totalMatches >= maxMatches };
         }
 
-        throw new Error(`Path does not exist or is not a file/directory: ${searchPath}`);
+        throw new Error(t('tool.grep.pathNotExists', { path: searchPath }));
     }
 });

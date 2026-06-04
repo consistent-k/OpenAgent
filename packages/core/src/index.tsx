@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 
+// 初始化语言设置
+const { getConfigLocale } = await import('./config');
+const { setLocale } = await import('@oagent/i18n');
+setLocale(getConfigLocale());
+
 if (process.argv.length > 2) {
     // 有子命令/参数 → 走 Commander CLI
     const { program } = await import('./cli');

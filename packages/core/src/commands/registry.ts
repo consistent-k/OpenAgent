@@ -27,6 +27,7 @@ export interface CommandContext {
 
 export interface SlashCommand {
     name: string;
-    description: string;
+    /** 获取命令描述（每次调用时动态翻译） */
+    getDescription(): string;
     run: (ctx: CommandContext) => void | Promise<void>;
 }

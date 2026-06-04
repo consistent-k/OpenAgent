@@ -1,4 +1,5 @@
 import os from 'node:os';
+import { t } from '@oagent/i18n';
 import { Box, Text } from 'ink';
 import React, { useEffect, useState } from 'react';
 import type { UsageInfo } from '../../hooks/useChatStream';
@@ -63,16 +64,16 @@ export function StatusBar({ cwd, modelId, usage }: StatusBarProps) {
             <Text color={theme.subtle}>{' | '}</Text>
             {usage ? (
                 <>
-                    <Text color={theme.textDim}>in:</Text>
+                    <Text color={theme.textDim}>{t('status.bar.inputLabel')}</Text>
                     <Text color={theme.accent}> {fmt(usage.inputTokens)} </Text>
-                    <Text color={theme.textDim}>out:</Text>
+                    <Text color={theme.textDim}>{t('status.bar.outputLabel')}</Text>
                     <Text color={theme.success}> {fmt(usage.outputTokens)} </Text>
                     <Text color={theme.subtle}>| </Text>
                     <Text color={usageColor}>{fmt(total)}</Text>
                     <Text color={theme.textDim}> ({pctFormatted}%)</Text>
                 </>
             ) : (
-                <Text color={theme.textDim}>no usage</Text>
+                <Text color={theme.textDim}>{t('status.bar.noUsage')}</Text>
             )}
         </Box>
     );

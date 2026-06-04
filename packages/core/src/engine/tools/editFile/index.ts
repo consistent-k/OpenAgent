@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { t } from '@oagent/i18n';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { isToolApproved } from '../utils/approval-store';
@@ -21,7 +22,7 @@ export const editFileTool = tool({
     }),
     execute: async ({ path: filePath, old_string, new_string, replace_all }) => {
         if (old_string === new_string) {
-            throw new Error('old_string and new_string must be different');
+            throw new Error(t('tool.editFile.sameStrings'));
         }
 
         const resolved = resolveSafePath(filePath);
@@ -29,11 +30,11 @@ export const editFileTool = tool({
 
         const count = content.split(old_string).length - 1;
         if (count === 0) {
-            throw new Error(`old_string not found in file: ${filePath}`);
+            throw new Error(t('tool.editFile.notFound', { filePath }));
         }
 
         if (!replace_all && count > 1) {
-            throw new Error(`old_string appears ${count} times in file. Use replace_all or provide a more specific old_string.`);
+            throw new Error(t('tool.editFile.multipleMatches', { count }));
         }
 
         const newContent = replace_all ? content.replaceAll(old_string, new_string) : content.replace(old_string, new_string);

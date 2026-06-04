@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { t } from '@oagent/i18n';
 import type { UIMessage } from 'ai';
 import { getOpenAgentDir } from '@/config';
 import { execFileAsync } from '@/utils/exec';
@@ -110,7 +111,7 @@ export async function loadSession(sessionId: string): Promise<SavedSession> {
     const content = await fs.readFile(sessionFilePath(sessionId), 'utf-8');
     const session = JSON.parse(content) as SavedSession;
     if (session.version !== SESSION_VERSION || !Array.isArray(session.displayMessages)) {
-        throw new Error(`会话文件格式不兼容：${sessionId}`);
+        throw new Error(t('error.session.incompatibleFormat', { sessionId }));
     }
     return session;
 }

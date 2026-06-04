@@ -1,0 +1,30 @@
+{
+    "name": "@oagent/i18n",
+    "version": "1.0.3",
+    "description": "i18n engine for OpenAgent with built-in zh/en and third-party locale extension support",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "clean": "rm -rf dist",
+        "build": "tsup",
+        "typecheck": "tsc --noEmit"
+    },
+    "engines": {
+        "node": ">=22"
+    },
+    "devDependencies": {
+        "tsup": "^8.5.1",
+        "typescript": "^6.0.0"
+    }
+}

@@ -1,5 +1,6 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { t } from '@oagent/i18n';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { isToolApproved } from '../utils/approval-store';
@@ -93,7 +94,7 @@ function isReadonlyCommand(command: string): boolean {
 function assertSafe(command: string): void {
     for (const { pattern, reason } of DANGEROUS_PATTERNS) {
         if (pattern.test(command)) {
-            throw new Error(`Refused to execute dangerous command (${reason}): ${command}`);
+            throw new Error(t('tool.bash.dangerRefused', { reason, command }));
         }
     }
 }
@@ -111,7 +112,7 @@ function tail(text: string, maxBytes: number): { text: string; cut: boolean } {
     }
 
     return {
-        text: `...(output truncated, ${Math.round((bytes - maxBytes) / 1024)}KB omitted)\n\n${buf.subarray(start).toString('utf-8')}`,
+        text: `${t('tool.bash.outputTruncated', { kb: Math.round((bytes - maxBytes) / 1024) })}\n\n${buf.subarray(start).toString('utf-8')}`,
         cut: true
     };
 }

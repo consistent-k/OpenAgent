@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { t } from '@oagent/i18n';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { ROOT_DIR, resolveReadPath } from '@/utils/safe-path';
@@ -12,10 +13,10 @@ function toPosixPath(filePath: string): string {
 
 function assertSafePattern(pattern: string): void {
     if (path.isAbsolute(pattern)) {
-        throw new Error('glob pattern must be a relative path');
+        throw new Error(t('tool.glob.absolutePath'));
     }
     if (pattern.split(/[\\/]+/).includes('..')) {
-        throw new Error('glob pattern cannot contain ".."');
+        throw new Error(t('tool.glob.parentRef'));
     }
 }
 
