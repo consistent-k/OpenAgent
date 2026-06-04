@@ -1,5 +1,8 @@
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { t } from '@oagent/i18n';
+
+const execAsync = promisify(exec);
 
 const PKG_NAME = '@oagent/oa';
 
@@ -14,16 +17,16 @@ export interface UpdateResult {
  * 检测当前全局安装 @oagent/oa 的包管理器
  * 检测顺序：pnpm → yarn → npm
  */
-export function detectPackageManager(): PackageManager | null {
-    const checks: [PackageManager, () => string | null][] = [
-        ['pnpm', () => parsePnpmVersion(execSync(`pnpm ls -g ${PKG_NAME} --json`, { encoding: 'utf-8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'] }))],
-        ['yarn', () => parseYarnVersion(execSync(`yarn global list --json`, { encoding: 'utf-8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'] }))],
-        ['npm', () => parseNpmVersion(execSync(`npm ls -g ${PKG_NAME} --depth=0 --json`, { encoding: 'utf-8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'] }))]
+export async function detectPackageManager(): Promise<PackageManager | null> {
+    const checks: [PackageManager, () => Promise<string | null>][] = [
+        ['pnpm', async () => parsePnpmVersion((await execAsync(`pnpm ls -g ${PKG_NAME} --json`, { encoding: 'utf-8', timeout: 10_000 })).stdout)],
+        ['yarn', async () => parseYarnVersion((await execAsync(`yarn global list --json`, { encoding: 'utf-8', timeout: 10_000 })).stdout)],
+        ['npm', async () => parseNpmVersion((await execAsync(`npm ls -g ${PKG_NAME} --depth=0 --json`, { encoding: 'utf-8', timeout: 10_000 })).stdout)]
     ];
 
     for (const [pm, getVersion] of checks) {
         try {
-            if (getVersion()) return pm;
+            if (await getVersion()) return pm;
         } catch {
             // ignore
         }
@@ -35,7 +38,7 @@ export function detectPackageManager(): PackageManager | null {
 /**
  * 获取当前已安装的版本
  */
-export function getCurrentVersion(pm: PackageManager): string | null {
+export async function getCurrentVersion(pm: PackageManager): Promise<string | null> {
     try {
         const commands: Record<PackageManager, string> = {
             npm: `npm ls -g ${PKG_NAME} --depth=0 --json`,
@@ -47,12 +50,11 @@ export function getCurrentVersion(pm: PackageManager): string | null {
             pnpm: parsePnpmVersion,
             yarn: parseYarnVersion
         };
-        const json = execSync(commands[pm], {
+        const { stdout } = await execAsync(commands[pm], {
             encoding: 'utf-8',
-            timeout: 10_000,
-            stdio: ['pipe', 'pipe', 'pipe']
+            timeout: 10_000
         });
-        return parsers[pm](json);
+        return parsers[pm](stdout);
     } catch {
         return null;
     }
@@ -61,14 +63,13 @@ export function getCurrentVersion(pm: PackageManager): string | null {
 /**
  * 从 npm registry 获取最新版本
  */
-export function getLatestVersion(): string | null {
+export async function getLatestVersion(): Promise<string | null> {
     try {
-        const out = execSync(`npm view ${PKG_NAME} version`, {
+        const { stdout } = await execAsync(`npm view ${PKG_NAME} version`, {
             encoding: 'utf-8',
-            timeout: 15_000,
-            stdio: ['pipe', 'pipe', 'pipe']
-        }).trim();
-        return out || null;
+            timeout: 15_000
+        });
+        return stdout.trim() || null;
     } catch {
         return null;
     }
@@ -78,7 +79,7 @@ export function getLatestVersion(): string | null {
  * 执行完整的更新流程：检测包管理器 → 比对版本 → 执行更新
  */
 export async function runUpdate(): Promise<UpdateResult> {
-    const pm = detectPackageManager();
+    const pm = await detectPackageManager();
     if (!pm) {
         return {
             success: false,
@@ -86,8 +87,8 @@ export async function runUpdate(): Promise<UpdateResult> {
         };
     }
 
-    const current = getCurrentVersion(pm);
-    const latest = getLatestVersion();
+    const current = await getCurrentVersion(pm);
+    const latest = await getLatestVersion();
 
     if (current && latest && current === latest) {
         return { success: true, message: t('update.alreadyLatest', { version: current }) };
@@ -99,13 +100,13 @@ export async function runUpdate(): Promise<UpdateResult> {
             pnpm: `pnpm update -g ${PKG_NAME}`,
             yarn: `yarn global upgrade ${PKG_NAME}`
         };
-        const output = execSync(updateCmds[pm], {
+        const { stdout } = await execAsync(updateCmds[pm], {
             encoding: 'utf-8',
-            timeout: 60_000,
-            stdio: ['pipe', 'pipe', 'pipe']
-        }).trim();
+            timeout: 60_000
+        });
+        const output = stdout.trim();
 
-        const newVersion = getCurrentVersion(pm);
+        const newVersion = await getCurrentVersion(pm);
         return {
             success: true,
             message: `${t('update.success', { current: current ?? '?', newVersion: newVersion ?? '?' })}${output ? `\n\n${output}` : ''}`
