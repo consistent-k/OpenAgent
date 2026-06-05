@@ -23,6 +23,7 @@ export interface CommandContext {
     setThemeName: (name: ThemeName) => void;
     showThemePicker: () => void;
     showConfigPicker: () => void;
+    showProviderPicker: () => void;
 }
 
 export interface SlashCommand {

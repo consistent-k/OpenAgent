@@ -1,7 +1,13 @@
 {
-    "baseUrl": "",
-    "apiKey": "",
-    "model": "",
+    "providers": [
+        {
+            "name": "OpenAI",
+            "baseUrl": "https://api.openai.com/v1",
+            "apiKey": "",
+            "models": ["gpt-4o", "gpt-4o-mini"]
+        }
+    ],
+    "activeModel": "OpenAI/gpt-4o",
     "maxSteps": 5,
     "channels": []
 }

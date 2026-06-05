@@ -1,6 +1,8 @@
+import { t } from '@oagent/i18n';
 import { Box, Text, useInput } from 'ink';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Dialog } from '@/ui/text/Dialog';
+import { ListItem } from '@/ui/text/ListItem';
 import { formatSessionTime, type SessionSummary } from '@/utils/sessions';
 
 interface Props {
@@ -94,43 +96,47 @@ export function SessionPicker({ sessions, onSelect, onCancel, onDelete }: Props)
         }
     }, [selectedIdx, clampedOffset]);
 
+    const rangeText =
+        sorted.length > 0
+            ? t('ui.sessionPicker.range', {
+                  from: clampedOffset + 1,
+                  to: Math.min(clampedOffset + VISIBLE_COUNT, sorted.length),
+                  total: sorted.length
+              })
+            : '';
+
     if (sorted.length === 0) {
         return (
-            <Dialog title="Sessions" onCancel={onCancel}>
-                <Box padding={1}>
-                    <Text dimColor>No saved sessions</Text>
+            <Dialog title={t('ui.sessionPicker.title')} onCancel={onCancel}>
+                <Box paddingX={1}>
+                    <Text dimColor>{t('ui.sessionPicker.empty')}</Text>
                 </Box>
             </Dialog>
         );
     }
 
     return (
-        <Dialog title="Sessions" onCancel={onCancel}>
+        <Dialog title={t('ui.sessionPicker.title')} subtitle={t('ui.sessionPicker.subtitle')} onConfirm={() => onSelect(sorted[selectedIdx]!.sessionId)} onCancel={onCancel}>
             <Box flexDirection="row">
                 <Box flexDirection="column" flexGrow={1}>
                     {visibleSessions.map((session, idx) => {
                         const globalIdx = clampedOffset + idx;
-                        const isSelected = globalIdx === selectedIdx;
                         const label = getDisplayLabel(session);
                         const shortId = session.sessionId.slice(0, 8);
                         return (
-                            <Box key={session.sessionId} paddingX={1}>
-                                <Text color={isSelected ? 'cyan' : undefined} bold={isSelected} inverse={isSelected}>
-                                    {isSelected ? '▸ ' : '  '}
-                                    {label}
-                                    <Text dimColor> ({shortId})</Text>
-                                </Text>
-                            </Box>
+                            <ListItem key={session.sessionId} isFocused={globalIdx === selectedIdx} description={`${shortId}`}>
+                                {label}
+                            </ListItem>
                         );
                     })}
                 </Box>
                 <Scrollbar total={sorted.length} offset={clampedOffset} visible={Math.min(VISIBLE_COUNT, sorted.length)} />
             </Box>
-            <Box paddingX={1} marginTop={1}>
-                <Text dimColor>
-                    ↑↓ navigate · PgUp/PgDn page · Enter load · Backspace delete · Esc cancel · {clampedOffset + 1}-{Math.min(clampedOffset + VISIBLE_COUNT, sorted.length)}/{sorted.length}
-                </Text>
-            </Box>
+            {rangeText && (
+                <Box paddingX={1} marginTop={1}>
+                    <Text dimColor>{rangeText}</Text>
+                </Box>
+            )}
         </Dialog>
     );
 }

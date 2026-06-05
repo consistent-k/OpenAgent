@@ -6,7 +6,6 @@ import type { PendingToolApproval } from '../../hooks/useChatStream';
 import { summarizeArgs } from '../../utils/summarize-args';
 import { Dialog } from '../text/Dialog';
 import { ListItem } from '../text/ListItem';
-import { Pane } from '../text/Pane';
 
 function getApprovalOptions() {
     return [t('ui.approval.approve'), t('ui.approval.alwaysApprove'), t('ui.approval.deny')] as const;
@@ -79,25 +78,21 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
     // ask_user_question with custom input mode
     if (isQuestion && customInputMode) {
         return (
-            <Pane color="suggestion">
-                <Box flexDirection="column" gap={1}>
-                    <Box flexDirection="column">
-                        <Text bold color="suggestion">
-                            {questionText || `${pending.toolName}(${summarizeArgs(pending.input)})`}
-                        </Text>
-                        <Text dimColor>{t('ui.approval.customInputHint')}</Text>
-                    </Box>
-                    <Box>
-                        <Text color="suggestion">{'❯ '}</Text>
-                        <TextInput value={customText} onChange={setCustomText} onSubmit={(v) => onSelectOption(v || customText)} />
-                    </Box>
-                    <Box marginTop={1}>
-                        <Text dimColor italic>
-                            {t('ui.approval.enterConfirmEscBack')}
-                        </Text>
-                    </Box>
+            <Dialog
+                title={questionText || `${pending.toolName}(${summarizeArgs(pending.input)})`}
+                subtitle={t('ui.approval.customInputHint')}
+                isActive={false}
+                onConfirm={() => onSelectOption(customText)}
+                onCancel={() => {
+                    setCustomInputMode(false);
+                    setCustomText('');
+                }}
+            >
+                <Box>
+                    <Text color="suggestion">{'❯ '}</Text>
+                    <TextInput value={customText} onChange={setCustomText} onSubmit={(v) => onSelectOption(v || customText)} />
                 </Box>
-            </Pane>
+            </Dialog>
         );
     }
 

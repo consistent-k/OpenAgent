@@ -1,10 +1,12 @@
 import React from 'react';
+import type { ProviderConfig } from '../../config';
 import type { PendingToolApproval } from '../../hooks/useChatStream';
 import type { SessionSummary } from '../../utils/sessions';
 import type { ThemeName } from '../text/theme';
 import { ApprovalDialog } from './ApprovalDialog';
 import type { ConfigItem } from './ConfigPicker';
 import { ConfigPicker } from './ConfigPicker';
+import { ProviderPicker } from './ProviderPicker';
 import { SessionPicker } from './SessionPicker';
 import { ThemePicker } from './ThemePicker';
 import type { OverlayType } from './useInputMode';
@@ -27,6 +29,18 @@ interface OverlaySlotProps {
     // Config picker
     configPicker: ConfigItem[] | null;
     onSaveConfig: (key: string, value: string) => void;
+    onManageProviders?: () => void;
+    onBackToConfig?: () => void;
+    // Provider picker
+    providerPickerOpen: boolean;
+    providerList: ProviderConfig[];
+    activeProviderName: string;
+    onAddProvider: (provider: ProviderConfig) => void;
+    onUpdateProvider: (name: string, updates: Partial<Omit<ProviderConfig, 'name'>> & { newName?: string }) => void;
+    onDeleteProvider: (name: string) => void;
+    onSetActiveProvider: (name: string) => void;
+    onAddModel: (providerName: string, modelName: string) => void;
+    onDeleteModel: (providerName: string, modelName: string) => void;
     // Unified cancel (Escape or picker's own cancel)
     onCancelPicker: () => void;
 }
@@ -45,6 +59,17 @@ export function OverlaySlot({
     onSelectTheme,
     configPicker,
     onSaveConfig,
+    onManageProviders,
+    onBackToConfig,
+    providerPickerOpen,
+    providerList,
+    activeProviderName,
+    onAddProvider,
+    onUpdateProvider,
+    onDeleteProvider,
+    onSetActiveProvider,
+    onAddModel,
+    onDeleteModel,
     onCancelPicker
 }: OverlaySlotProps) {
     if (overlayType === 'approval' && pendingApproval) {
@@ -60,7 +85,23 @@ export function OverlaySlot({
     }
 
     if (overlayType === 'config' && configPicker) {
-        return <ConfigPicker items={configPicker} onSave={onSaveConfig} onCancel={onCancelPicker} />;
+        return <ConfigPicker items={configPicker} onSave={onSaveConfig} onCancel={onCancelPicker} onManageProviders={onManageProviders} />;
+    }
+
+    if (overlayType === 'provider' && providerPickerOpen) {
+        return (
+            <ProviderPicker
+                providers={providerList}
+                activeProviderName={activeProviderName}
+                onAdd={onAddProvider}
+                onUpdate={onUpdateProvider}
+                onDelete={onDeleteProvider}
+                onSetActive={onSetActiveProvider}
+                onAddModel={onAddModel}
+                onDeleteModel={onDeleteModel}
+                onBack={onBackToConfig ?? onCancelPicker}
+            />
+        );
     }
 
     return null;

@@ -2,7 +2,21 @@ import { t } from '@oagent/i18n';
 import { Box, useApp, useInput } from 'ink';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { findCommand, COMMANDS, parseCommandInput } from './commands';
-import { getConfigSummary, saveConfig, reloadConfig, isConfigReady, type OpenAgentConfig } from './config';
+import {
+    getConfigSummary,
+    saveConfig,
+    reloadConfig,
+    isConfigReady,
+    setActiveModel,
+    getProviders,
+    addProvider,
+    deleteProvider,
+    updateProvider,
+    addModel,
+    deleteModel,
+    getActiveProviderName,
+    type ProviderConfig
+} from './config';
 import { useChatStream } from './hooks/useChatStream';
 import { useFileIndex } from './hooks/useFileIndex';
 import { useLocaleSetup } from './hooks/useLocaleSetup';
@@ -59,6 +73,12 @@ function AppContent() {
     const [sessionPicker, setSessionPicker] = useState<SessionSummary[] | null>(null);
     const [themePickerOpen, setThemePickerOpen] = useState(false);
     const [configPickerOpen, setConfigPickerOpen] = useState(false);
+    const [providerPickerOpen, setProviderPickerOpen] = useState(false);
+    const [providerList, setProviderList] = useState<ProviderConfig[]>([]);
+
+    const refreshProviderList = useCallback(() => {
+        setProviderList(getProviders());
+    }, []);
 
     const sessionIdRef = useRef<string>(uid());
     const newSessionId = useCallback(() => {
@@ -80,7 +100,7 @@ function AppContent() {
                     parts: [
                         {
                             type: 'text',
-                            text: [t('app.welcome'), '', t('app.welcome.baseUrl'), t('app.welcome.apiKey'), t('app.welcome.model'), '', t('app.welcome.hint')].join('\n'),
+                            text: [t('app.welcome'), '', t('app.welcome.providers'), t('app.welcome.activeModel'), '', t('app.welcome.hint')].join('\n'),
                             state: 'done'
                         }
                     ]
@@ -91,10 +111,9 @@ function AppContent() {
 
     const getConfigItems = useCallback((): ConfigItem[] => {
         const config = getConfigSummary();
+        const activeModelDisplay = config.provider && config.model ? `${config.provider}/${config.model}` : config.model || '-';
         return [
-            { key: 'baseUrl', label: 'Base URL', value: config.baseUrl, editable: true },
-            { key: 'apiKey', label: 'API Key', value: config.apiKey, editable: true },
-            { key: 'model', label: 'Model', value: config.model, editable: true },
+            { key: 'activeModel', label: 'Active Model', value: activeModelDisplay, editable: true },
             { key: 'maxSteps', label: 'Max Steps', value: String(config.maxSteps), editable: true },
             { key: 'locale', label: 'Language', value: config.locale, editable: true }
         ];
@@ -104,23 +123,28 @@ function AppContent() {
 
     const handleSaveConfig = useCallback(
         (key: string, value: string) => {
-            const updates: Partial<OpenAgentConfig> & { locale?: string } = {};
-            if (key === 'maxSteps') {
-                updates.maxSteps = Number(value);
-            } else if (key === 'locale') {
-                updates.locale = value;
-            } else {
-                (updates as Record<string, string>)[key] = value;
-            }
             try {
-                saveConfig(updates);
+                if (key === 'activeModel') {
+                    // 解析 "ProviderName/ModelName" 格式
+                    const slashIndex = value.indexOf('/');
+                    if (slashIndex === -1) {
+                        throw new Error('格式应为：供应商名/模型名，如 OpenAI/gpt-4o');
+                    }
+                    const providerName = value.slice(0, slashIndex);
+                    const modelName = value.slice(slashIndex + 1);
+                    setActiveModel(providerName, modelName);
+                } else if (key === 'maxSteps') {
+                    saveConfig({ maxSteps: Number(value) });
+                } else if (key === 'locale') {
+                    saveConfig({ locale: value });
+                }
                 reloadConfig();
                 setConfigItems(getConfigItems());
                 setConfigPickerOpen(false);
                 setInputValue('');
                 appendMessages([
                     { id: uid(), role: 'user', parts: [{ type: 'text', text: `/config` }] },
-                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.configUpdated', { key, value: key === 'apiKey' ? '****' : value }), state: 'done' }] }
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.configUpdated', { key, value }), state: 'done' }] }
                 ]);
             } catch (error) {
                 appendMessages([
@@ -132,10 +156,149 @@ function AppContent() {
         [getConfigItems, appendMessages]
     );
 
+    const handleManageProviders = useCallback(() => {
+        refreshProviderList();
+        setConfigPickerOpen(false);
+        setProviderPickerOpen(true);
+    }, [refreshProviderList]);
+
+    const handleBackToConfig = useCallback(() => {
+        setProviderPickerOpen(false);
+        setConfigItems(getConfigItems());
+        setConfigPickerOpen(true);
+    }, [getConfigItems]);
+
+    const handleAddProvider = useCallback(
+        (provider: ProviderConfig) => {
+            try {
+                addProvider(provider);
+                reloadConfig();
+                refreshProviderList();
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.providerAdded', { name: provider.name }), state: 'done' }] }
+                ]);
+            } catch (error) {
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.configSaveFailed', { error: getErrorMessage(error) }), state: 'done' }] }
+                ]);
+            }
+        },
+        [refreshProviderList, appendMessages]
+    );
+
+    const handleUpdateProvider = useCallback(
+        (name: string, updates: Partial<Omit<ProviderConfig, 'name'>> & { newName?: string }) => {
+            try {
+                updateProvider(name, updates);
+                reloadConfig();
+                refreshProviderList();
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.providerUpdated', { name: updates.newName ?? name }), state: 'done' }] }
+                ]);
+            } catch (error) {
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.configSaveFailed', { error: getErrorMessage(error) }), state: 'done' }] }
+                ]);
+            }
+        },
+        [refreshProviderList, appendMessages]
+    );
+
+    const handleDeleteProvider = useCallback(
+        (name: string) => {
+            try {
+                deleteProvider(name);
+                reloadConfig();
+                refreshProviderList();
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.providerDeleted', { name }), state: 'done' }] }
+                ]);
+            } catch (error) {
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.configSaveFailed', { error: getErrorMessage(error) }), state: 'done' }] }
+                ]);
+            }
+        },
+        [refreshProviderList, appendMessages]
+    );
+
+    const handleSetActiveProvider = useCallback(
+        (name: string) => {
+            try {
+                const providers = getProviders();
+                const provider = providers.find((p) => p.name === name);
+                if (!provider) throw new Error(t('error.config.providerNotFound', { name }));
+                if (provider.models.length === 0) {
+                    throw new Error(t('error.config.modelNotFound', { model: '', provider: name }));
+                }
+                setActiveModel(name, provider.models[0]!);
+                reloadConfig();
+                refreshProviderList();
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.providerSetActive', { name }), state: 'done' }] }
+                ]);
+            } catch (error) {
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.configSaveFailed', { error: getErrorMessage(error) }), state: 'done' }] }
+                ]);
+            }
+        },
+        [refreshProviderList, appendMessages]
+    );
+
+    const handleAddModel = useCallback(
+        (providerName: string, modelName: string) => {
+            try {
+                addModel(providerName, modelName);
+                reloadConfig();
+                refreshProviderList();
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.modelAdded', { model: modelName, provider: providerName }), state: 'done' }] }
+                ]);
+            } catch (error) {
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.configSaveFailed', { error: getErrorMessage(error) }), state: 'done' }] }
+                ]);
+            }
+        },
+        [refreshProviderList, appendMessages]
+    );
+
+    const handleDeleteModel = useCallback(
+        (providerName: string, modelName: string) => {
+            try {
+                deleteModel(providerName, modelName);
+                reloadConfig();
+                refreshProviderList();
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.modelDeleted', { model: modelName, provider: providerName }), state: 'done' }] }
+                ]);
+            } catch (error) {
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: '/config' }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('app.configSaveFailed', { error: getErrorMessage(error) }), state: 'done' }] }
+                ]);
+            }
+        },
+        [refreshProviderList, appendMessages]
+    );
+
     const handleCancelPicker = useCallback(() => {
         setSessionPicker(null);
         setThemePickerOpen(false);
         setConfigPickerOpen(false);
+        setProviderPickerOpen(false);
     }, []);
 
     const lastIdx = displayMessages.length - 1;
@@ -249,6 +412,10 @@ function AppContent() {
                         showConfigPicker: () => {
                             setConfigItems(getConfigItems());
                             setConfigPickerOpen(true);
+                        },
+                        showProviderPicker: () => {
+                            refreshProviderList();
+                            setProviderPickerOpen(true);
                         }
                     });
                 } catch (error) {
@@ -318,6 +485,17 @@ function AppContent() {
                 onSelectTheme={handleSelectTheme}
                 configPicker={configPickerOpen ? configItems : null}
                 onSaveConfig={handleSaveConfig}
+                onManageProviders={handleManageProviders}
+                onBackToConfig={handleBackToConfig}
+                providerPickerOpen={providerPickerOpen}
+                providerList={providerList}
+                activeProviderName={getActiveProviderName()}
+                onAddProvider={handleAddProvider}
+                onUpdateProvider={handleUpdateProvider}
+                onDeleteProvider={handleDeleteProvider}
+                onSetActiveProvider={handleSetActiveProvider}
+                onAddModel={handleAddModel}
+                onDeleteModel={handleDeleteModel}
                 onCancelPicker={handleCancelPicker}
             />
             <StatusBar cwd={cwd} modelId={modelId} usage={usage} />

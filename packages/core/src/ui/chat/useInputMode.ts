@@ -7,8 +7,8 @@ import type { SessionSummary } from '../../utils/sessions';
 import type { ThemeName } from '../text/theme';
 import type { ConfigItem } from './ConfigPicker';
 
-export type InputMode = 'approval' | 'session' | 'theme' | 'config' | 'disabled' | 'command' | 'file' | 'text';
-export type OverlayType = 'approval' | 'session' | 'theme' | 'config' | null;
+export type InputMode = 'approval' | 'session' | 'theme' | 'config' | 'provider' | 'disabled' | 'command' | 'file' | 'text';
+export type OverlayType = 'approval' | 'session' | 'theme' | 'config' | 'provider' | null;
 
 interface UseInputModeOptions {
     value: string;
@@ -17,6 +17,7 @@ interface UseInputModeOptions {
     sessionPicker: SessionSummary[] | null;
     themePicker: ThemeName | null;
     configPicker: ConfigItem[] | null;
+    providerPicker: boolean;
     filteredCommands: SlashCommand[];
     fileMatches: FileEntry[];
     commandIndex: number;
@@ -39,11 +40,13 @@ function getMode(
     pendingApproval: PendingToolApproval | null,
     sessionPicker: SessionSummary[] | null,
     themePicker: ThemeName | null,
-    configPicker: ConfigItem[] | null
+    configPicker: ConfigItem[] | null,
+    providerPicker: boolean
 ): InputMode {
     if (pendingApproval) return 'approval';
     if (sessionPicker) return 'session';
     if (themePicker) return 'theme';
+    if (providerPicker) return 'provider';
     if (configPicker) return 'config';
     if (disabled) return 'disabled';
     if (value.startsWith('/') && !/\s/.test(value)) return 'command';
@@ -52,7 +55,7 @@ function getMode(
 }
 
 function getOverlayType(mode: InputMode): OverlayType {
-    if (mode === 'approval' || mode === 'session' || mode === 'theme' || mode === 'config') {
+    if (mode === 'approval' || mode === 'session' || mode === 'theme' || mode === 'config' || mode === 'provider') {
         return mode;
     }
     return null;
@@ -65,6 +68,7 @@ export function useInputMode({
     sessionPicker,
     themePicker,
     configPicker,
+    providerPicker,
     filteredCommands,
     fileMatches,
     commandIndex,
@@ -77,7 +81,7 @@ export function useInputMode({
     const [resetKey, setResetKey] = useState(0);
     const prevModeRef = useRef<InputMode>('text');
 
-    const mode = getMode(value, disabled, pendingApproval, sessionPicker, themePicker, configPicker);
+    const mode = getMode(value, disabled, pendingApproval, sessionPicker, themePicker, configPicker, providerPicker);
     const overlayType = getOverlayType(mode);
 
     // Reset TextInput when returning to text mode from a non-text mode
@@ -99,7 +103,8 @@ export function useInputMode({
             }
 
             // Escape: exit overlay/approval → notify parent to clear picker state
-            if (key.escape && overlayType) {
+            // Skip for 'provider' overlay — it handles Esc navigation internally
+            if (key.escape && overlayType && overlayType !== 'provider') {
                 onCancelPicker();
                 return;
             }

@@ -1,7 +1,7 @@
 import { t } from '@oagent/i18n';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Dialog } from '../text/Dialog';
 import { ListItem } from '../text/ListItem';
 
@@ -16,12 +16,15 @@ interface ConfigPickerProps {
     items: ConfigItem[];
     onSave: (key: string, value: string) => void;
     onCancel: () => void;
+    onManageProviders?: () => void;
 }
 
-export function ConfigPicker({ items, onSave, onCancel }: ConfigPickerProps) {
+export function ConfigPicker({ items, onSave, onCancel, onManageProviders }: ConfigPickerProps) {
     const [index, setIndex] = useState(0);
     const [editing, setEditing] = useState<ConfigItem | null>(null);
     const [editValue, setEditValue] = useState('');
+
+    const allItems = useMemo(() => [...items, { key: 'providers', label: t('ui.configPicker.providers'), value: '', editable: false }], [items]);
 
     useInput(
         (_input, key) => {
@@ -29,7 +32,7 @@ export function ConfigPicker({ items, onSave, onCancel }: ConfigPickerProps) {
             if (key.upArrow) {
                 setIndex((i) => Math.max(0, i - 1));
             } else if (key.downArrow) {
-                setIndex((i) => Math.min(items.length - 1, i + 1));
+                setIndex((i) => Math.min(allItems.length - 1, i + 1));
             }
         },
         { isActive: true }
@@ -66,28 +69,36 @@ export function ConfigPicker({ items, onSave, onCancel }: ConfigPickerProps) {
         );
     }
 
-    const focusedItem = items[index]!;
+    const focusedItem = allItems[index]!;
 
     return (
         <Dialog
             title={t('ui.configPicker.title')}
             subtitle={t('ui.configPicker.subtitle')}
             onConfirm={
-                focusedItem.editable
-                    ? () => {
-                          setEditing(focusedItem);
-                          setEditValue(focusedItem.value);
-                      }
-                    : undefined
+                focusedItem.key === 'providers'
+                    ? onManageProviders
+                    : focusedItem.editable
+                      ? () => {
+                            setEditing(focusedItem);
+                            setEditValue(focusedItem.value);
+                        }
+                      : undefined
             }
             onCancel={onCancel}
         >
-            {items.map((item, i) => (
+            {allItems.map((item, i) => (
                 <ListItem
                     key={item.key}
                     isFocused={i === index}
-                    disabled={!item.editable}
-                    description={item.editable ? t('ui.configPicker.currentValueShort', { value: item.value }) : t('ui.configPicker.currentValueNotEditable', { value: item.value })}
+                    disabled={!item.editable && item.key !== 'providers'}
+                    description={
+                        item.key === 'providers'
+                            ? ''
+                            : item.editable
+                              ? t('ui.configPicker.currentValueShort', { value: item.value })
+                              : t('ui.configPicker.currentValueNotEditable', { value: item.value })
+                    }
                 >
                     {item.label}
                 </ListItem>

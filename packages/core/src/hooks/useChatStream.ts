@@ -3,7 +3,7 @@ import { t } from '@oagent/i18n';
 import type { ModelMessage, UIMessage, UIMessageChunk, DynamicToolUIPart, ToolUIPart, ChatTransport } from 'ai';
 import { convertToModelMessages, getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getModelName, isConfigReady } from '../config';
+import { getModelName, getActiveProviderName, isConfigReady } from '../config';
 import { runAgent } from '../engine';
 import { setRetryCallback, clearRetryCallback, type RetryInfo } from '../engine/middleware/retry-notification';
 import { setToolApproval } from '../engine/tools/utils/approval-store';
@@ -141,7 +141,9 @@ function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableSt
 
 export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChatStreamResult {
     const usageRef = useRef<UsageInfo | null>(null);
-    const modelIdRef = useRef(getModelName());
+    const providerName = getActiveProviderName();
+    const modelName = getModelName();
+    const modelIdRef = useRef(providerName && modelName ? `${providerName}/${modelName}` : modelName);
     const [tip, setTip] = useState<TipState>(null);
 
     // Transport is stable — reads agent lazily from ref each call

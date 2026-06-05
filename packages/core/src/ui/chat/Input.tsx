@@ -3,6 +3,7 @@ import { Box, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { COMMANDS, findCommand, type SlashCommand } from '../../commands';
+import type { ProviderConfig } from '../../config';
 import type { PendingToolApproval } from '../../hooks/useChatStream';
 import { getActiveMention, filterFiles, type FileEntry } from '../../utils/files';
 import type { SessionSummary } from '../../utils/sessions';
@@ -38,6 +39,18 @@ interface InputProps {
     onSelectTheme: (name: ThemeName) => void;
     configPicker: ConfigItem[] | null;
     onSaveConfig: (key: string, value: string) => void;
+    onManageProviders: () => void;
+    onBackToConfig: () => void;
+    // Provider picker
+    providerPickerOpen: boolean;
+    providerList: ProviderConfig[];
+    activeProviderName: string;
+    onAddProvider: (provider: ProviderConfig) => void;
+    onUpdateProvider: (name: string, updates: Partial<Omit<ProviderConfig, 'name'>> & { newName?: string }) => void;
+    onDeleteProvider: (name: string) => void;
+    onSetActiveProvider: (name: string) => void;
+    onAddModel: (providerName: string, modelName: string) => void;
+    onDeleteModel: (providerName: string, modelName: string) => void;
     onCancelPicker: () => void;
 }
 
@@ -59,6 +72,17 @@ export function Input({
     onSelectTheme,
     configPicker,
     onSaveConfig,
+    onManageProviders,
+    onBackToConfig,
+    providerPickerOpen,
+    providerList,
+    activeProviderName,
+    onAddProvider,
+    onUpdateProvider,
+    onDeleteProvider,
+    onSetActiveProvider,
+    onAddModel,
+    onDeleteModel,
     onCancelPicker
 }: InputProps) {
     // Command filtering
@@ -85,6 +109,7 @@ export function Input({
         sessionPicker,
         themePicker,
         configPicker,
+        providerPicker: providerPickerOpen,
         filteredCommands,
         fileMatches,
         commandIndex,
@@ -157,6 +182,17 @@ export function Input({
                 onSelectTheme={onSelectTheme}
                 configPicker={configPicker}
                 onSaveConfig={onSaveConfig}
+                onManageProviders={onManageProviders}
+                onBackToConfig={onBackToConfig}
+                providerPickerOpen={providerPickerOpen}
+                providerList={providerList}
+                activeProviderName={activeProviderName}
+                onAddProvider={onAddProvider}
+                onUpdateProvider={onUpdateProvider}
+                onDeleteProvider={onDeleteProvider}
+                onSetActiveProvider={onSetActiveProvider}
+                onAddModel={onAddModel}
+                onDeleteModel={onDeleteModel}
                 onCancelPicker={onCancelPicker}
             />
         );

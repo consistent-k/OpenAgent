@@ -33,7 +33,7 @@ pnpm publish:channels  # 单独发布 @oagent/channels
 pnpm publish:weixin    # 单独发布 @oagent/weixin
 ```
 
-配置模型：`cp config.example.json ~/.openagent/config.json`，然后编辑填入 `baseUrl`、`apiKey`、`model`。也可以用环境变量 `OPENAGENT_BASE_URL`、`OPENAGENT_API_KEY`、`OPENAGENT_MODEL` 临时覆盖。
+配置模型：`cp config.example.json ~/.openagent/config.json`，然后编辑 `providers` 数组填入供应商信息（`name`、`baseUrl`、`apiKey`、`models`），并设置 `activeModel` 为 `"供应商名/模型名"` 格式。也可以用环境变量 `OPENAGENT_BASE_URL`、`OPENAGENT_API_KEY`、`OPENAGENT_MODEL` 临时覆盖（会创建一个名为 `env` 的临时供应商）。
 
 ## 架构概览
 
@@ -44,7 +44,7 @@ packages/                  # monorepo 子包（pnpm workspaces）
 │       ├── index.tsx              # 入口，调用 Ink render(<App />)
 │       ├── App.tsx                # 主组件：编排聊天流、命令处理、会话保存
 │       ├── config/
-│       │   └── index.ts           # 配置管理（baseUrl、apiKey、model、maxSteps、channels 等）
+│       │   └── index.ts           # 配置管理（多供应商 providers、activeModel、maxSteps、channels 等）
 │       ├── hooks/
 │       │   ├── useChatStream.ts   # 核心聊天流：调用 AI SDK streamText，处理工具调用、分段更新
 │       │   └── useFileIndex.ts    # 文件索引：@mention 补全用的文件列表

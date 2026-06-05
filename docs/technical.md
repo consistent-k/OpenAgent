@@ -333,21 +333,34 @@ flowchart TD
 
 ### 6.2 配置项
 
-| 配置项     | 环境变量              | 必填 | 默认值 | 说明                                          |
-| ---------- | --------------------- | ---- | ------ | --------------------------------------------- |
-| `baseUrl`  | `OPENAGENT_BASE_URL`  | 是   | —      | OpenAI 兼容 API 的基础 URL                    |
-| `apiKey`   | `OPENAGENT_API_KEY`   | 是   | —      | API 密钥                                      |
-| `model`    | `OPENAGENT_MODEL`     | 是   | —      | 模型标识符                                    |
-| `maxSteps` | `OPENAGENT_MAX_STEPS` | 否   | 20     | Agent 最大执行步数 (1-20)                     |
-| `channels` | —                     | 否   | `[]`   | Channel 插件包名列表，如 `["@oagent/weixin"]` |
+| 配置项        | 环境变量              | 必填 | 默认值 | 说明                                                       |
+| ------------- | --------------------- | ---- | ------ | ---------------------------------------------------------- |
+| `providers`   | —                     | 是   | `[]`   | 供应商列表，每个包含 `name`、`baseUrl`、`apiKey`、`models` |
+| `activeModel` | —                     | 是   | —      | 当前激活模型，格式 `"供应商名/模型名"`                     |
+| `maxSteps`    | `OPENAGENT_MAX_STEPS` | 否   | 20     | Agent 最大执行步数 (1-20)                                  |
+| `channels`    | —                     | 否   | `[]`   | Channel 插件包名列表，如 `["@oagent/weixin"]`              |
+
+环境变量 `OPENAGENT_BASE_URL`、`OPENAGENT_API_KEY`、`OPENAGENT_MODEL` 可作为单供应商快捷覆盖（会创建名为 `env` 的临时供应商）。
 
 ### 6.3 配置文件格式
 
 ```json
 {
-    "baseUrl": "https://api.example.com/v1",
-    "apiKey": "sk-xxx",
-    "model": "gpt-4o",
+    "providers": [
+        {
+            "name": "OpenAI",
+            "baseUrl": "https://api.openai.com/v1",
+            "apiKey": "sk-xxx",
+            "models": ["gpt-4o", "gpt-4o-mini"]
+        },
+        {
+            "name": "Anthropic",
+            "baseUrl": "https://api.anthropic.com",
+            "apiKey": "sk-ant-xxx",
+            "models": ["claude-sonnet-4-20250514"]
+        }
+    ],
+    "activeModel": "OpenAI/gpt-4o",
     "maxSteps": 20,
     "channels": ["@oagent/weixin"]
 }
@@ -356,14 +369,17 @@ flowchart TD
 ### 6.4 导出函数
 
 ```typescript
-readEnvConfig(): OpenAgentConfig          // 读取环境变量中的配置（OPENAGENT_*）
-isConfigReady(): boolean                  // 检查 baseUrl/apiKey/model 是否已配置
-getApiKey(): string                       // 获取 API Key（必填，缺失抛异常）
-getBaseUrl(): string                      // 获取基础 URL（必填，缺失抛异常）
-getModelName(): string                    // 获取模型名（必填，缺失抛异常）
+isConfigReady(): boolean                  // 检查 providers 非空且 activeModel 有效
+getApiKey(): string                       // 获取当前激活供应商的 API Key
+getBaseUrl(): string                      // 获取当前激活供应商的 Base URL
+getModelName(): string                    // 获取当前激活的模型名（不含供应商前缀）
+getActiveProviderName(): string           // 获取当前激活供应商的名称
+getProviders(): ProviderConfig[]          // 获取所有供应商列表
+getAllModelOptions(): string[]             // 获取所有 "供应商名/模型名" 格式的选项
+setActiveModel(provider, model): void     // 切换当前激活的模型
 getMaxSteps(): number                     // 获取最大步数（默认 20，范围 1-20）
 getConfiguredChannels(): string[]         // 获取已配置的 Channel 插件列表
-getConfigSummary()                        // 获取配置摘要（API Key 脱敏：前4位...后4位）
+getConfigSummary()                        // 获取配置摘要（含 provider、API Key 脱敏）
 saveConfig(config): void                  // 保存配置到文件
 reloadConfig(): void                      // 重新加载配置
 ```

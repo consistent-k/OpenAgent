@@ -11,23 +11,25 @@ interface DialogProps {
     subtitle?: React.ReactNode;
     children: React.ReactNode;
     onConfirm?: () => void;
-    onCancel: () => void;
+    onCancel?: () => void;
     color?: StringThemeKeys;
+    /** 是否激活键盘监听（默认 true） */
+    isActive?: boolean;
 }
 
-export function Dialog({ title, subtitle, children, onConfirm, onCancel, color = 'suggestion' }: DialogProps) {
+export function Dialog({ title, subtitle, children, onConfirm, onCancel, color = 'suggestion', isActive = true }: DialogProps) {
     useInput(
         useCallback(
             (_input, key) => {
                 if (key.return) {
                     onConfirm?.();
                 } else if (key.escape) {
-                    onCancel();
+                    onCancel?.();
                 }
             },
             [onConfirm, onCancel]
         ),
-        { isActive: true }
+        { isActive }
     );
 
     return (

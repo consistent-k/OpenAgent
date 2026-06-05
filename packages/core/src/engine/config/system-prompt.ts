@@ -47,8 +47,9 @@ When asked about your identity or model:
 
 Configuration information:
 - Your configuration file is located at ${CONFIG_PATH} (NOT ~/.claude/settings.json)
-- Users can configure baseUrl, apiKey, model, and other settings in this file
-- Environment variables OPENAGENT_BASE_URL, OPENAGENT_API_KEY, OPENAGENT_MODEL can also be used
+- Users can configure multiple providers (each with baseUrl, apiKey, models) and select an active model
+- Environment variables OPENAGENT_BASE_URL, OPENAGENT_API_KEY, OPENAGENT_MODEL can also be used as a quick override
+- Current provider: ${config.provider || 'Not configured'}
 - Currently using model: ${config.model || 'Not configured'}
 - IMPORTANT: Never output sensitive information like apiKey, api_key, API_KEY, or any other credentials in your responses. If you need to show configuration, mask sensitive values with asterisks (e.g., "sk-...abc" or "***")
 
