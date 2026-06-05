@@ -7,8 +7,9 @@ import { getMaxSteps, getModelName } from '@/config';
 
 export async function runAgent(messages: ModelMessage[], abortSignal?: AbortSignal, opts?: { maxRetries?: number }) {
     const { skill } = await getSkill();
+    const maxRetries = opts?.maxRetries ?? 10;
     return streamText({
-        model: getProvider()(getModelName()),
+        model: getProvider(maxRetries)(getModelName()),
         stopWhen: stepCountIs(getMaxSteps()),
         system: getSystemPrompt(),
         messages,
@@ -17,6 +18,6 @@ export async function runAgent(messages: ModelMessage[], abortSignal?: AbortSign
             ...tools
         },
         abortSignal,
-        maxRetries: opts?.maxRetries ?? 10
+        maxRetries
     });
 }

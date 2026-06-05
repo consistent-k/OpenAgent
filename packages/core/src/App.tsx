@@ -1,5 +1,5 @@
 import { t } from '@oagent/i18n';
-import { Box, Text, useApp, useInput } from 'ink';
+import { Box, useApp, useInput } from 'ink';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { findCommand, COMMANDS, parseCommandInput } from './commands';
 import { getConfigSummary, saveConfig, reloadConfig, isConfigReady, type OpenAgentConfig } from './config';
@@ -12,6 +12,7 @@ import { MessageList } from './ui/messages/MessageList';
 import { PartRenderer } from './ui/messages/PartRenderer';
 import { Header } from './ui/status/Header';
 import { StatusBar } from './ui/status/StatusBar';
+import { Tips } from './ui/status/Tips';
 import { ThemeProvider, useTheme, type ThemeName } from './ui/text/theme';
 import { getErrorMessage } from './utils/errors';
 import { appendHistory, deleteSession, listSessions, loadSession, saveSession } from './utils/sessions';
@@ -30,14 +31,14 @@ function AppContent() {
     const { exit } = useApp();
     const { themeName, setThemeName } = useTheme();
     const cwd = process.cwd();
-    const { fileIndex, status: fileIndexStatus, reload: reloadFileIndex } = useFileIndex(cwd);
+    const { fileIndex, reload: reloadFileIndex } = useFileIndex(cwd);
     const {
         displayMessages,
         status,
         usage,
         modelId,
         pendingApproval,
-        error,
+        tip,
         send,
         approvePendingTool,
         alwaysApprovePendingTool,
@@ -287,7 +288,7 @@ function AppContent() {
 
     return (
         <Box flexDirection="column">
-            <Header status={status} fileIndexStatus={fileIndexStatus} fileIndexCount={fileIndex.length} pendingApproval={pendingApproval !== null} />
+            <Header status={status} pendingApproval={pendingApproval !== null} />
             {historyMessages.length > 0 && <MessageList messages={historyMessages} showReasoning={showReasoning} showToolDetails={showToolDetails} />}
             {streamingMessage && (
                 <Box flexDirection="column" paddingX={1}>
@@ -298,11 +299,7 @@ function AppContent() {
                     </Box>
                 </Box>
             )}
-            {error && (
-                <Box flexDirection="column" paddingX={1} marginBottom={1}>
-                    <Text color="red">⚠️ {error.message}</Text>
-                </Box>
-            )}
+            <Tips tip={tip} />
             <Input
                 value={inputValue}
                 onChange={setInputValue}

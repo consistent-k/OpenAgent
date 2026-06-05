@@ -245,6 +245,9 @@ export const zh: Record<string, string> = {
     'update.success': '✅ 更新完成！v{current} → v{newVersion}\n请重启 oa 以使用新版本。',
     'update.failed': '❌ 更新失败：{error}',
 
+    // ── Tips ──
+    'tips.retrying': '⚠ 429 限流，重试中 ({attempt}/{max}) 等待 {delay}s…',
+
     // ── CLI ──
     'cli.description': 'OpenAgent - 终端 AI Agent 客户端',
     'cli.updateDescription': '通过 npm/pnpm/yarn 全局更新 oa 至最新版本'

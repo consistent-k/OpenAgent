@@ -5,10 +5,15 @@ import { convertToModelMessages, getToolName, isToolUIPart, lastAssistantMessage
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getModelName, isConfigReady } from '../config';
 import { runAgent } from '../engine';
+import { setRetryCallback, clearRetryCallback, type RetryInfo } from '../engine/middleware/retry-notification';
 import { setToolApproval } from '../engine/tools/utils/approval-store';
-import { getErrorMessage } from '../utils/errors';
+import { extractApiErrorMessage } from '../utils/errors';
 import { expandMentions, type FileEntry } from '../utils/files';
 import { uid } from '../utils/uid';
+
+/** 统一的提示状态 */
+export type TipState = { type: 'retry'; info: RetryInfo } | { type: 'error'; message: string } | null;
+export type { RetryInfo };
 
 export type ChatStatus = 'idle' | 'streaming' | 'awaiting_approval';
 
@@ -37,7 +42,7 @@ interface UseChatStreamResult {
     usage: UsageInfo | null;
     modelId: string;
     pendingApproval: PendingToolApproval | null;
-    error: Error | undefined;
+    tip: TipState;
     send: (text: string) => Promise<void>;
     approvePendingTool: () => Promise<void>;
     alwaysApprovePendingTool: () => Promise<void>;
@@ -47,20 +52,6 @@ interface UseChatStreamResult {
     setSession: (displayMessages: UIMessage[]) => void;
     reset: () => void;
     cancel: () => void;
-}
-
-/** 从 API 错误中提取可读的错误信息 */
-function extractApiErrorMessage(err: unknown): string {
-    const e = err as { responseBody?: string };
-    if (e.responseBody) {
-        try {
-            const body = JSON.parse(e.responseBody);
-            if (body.error?.message) return body.error.message;
-        } catch {
-            // not JSON
-        }
-    }
-    return getErrorMessage(err);
 }
 
 /** 从 UIMessage 的 tool parts 中提取待审批/待交互信息（只扫描最后一条 assistant 消息） */
@@ -151,11 +142,15 @@ function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableSt
 export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChatStreamResult {
     const usageRef = useRef<UsageInfo | null>(null);
     const modelIdRef = useRef(getModelName());
+    const [tip, setTip] = useState<TipState>(null);
 
     // Transport is stable — reads agent lazily from ref each call
     const transport = useMemo<ChatTransport<UIMessage>>(
         () => ({
             async sendMessages({ messages, abortSignal }) {
+                // 设置重试通知回调
+                setRetryCallback((info) => setTip({ type: 'retry', info }));
+
                 const modelMessage = await convertToModelMessages(messages);
                 const result = await runAgent(modelMessage, abortSignal);
 
@@ -212,13 +207,22 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
     }, [chatStatus, pendingApproval]);
 
     const [messages, setModelMessages] = useState<ModelMessage[]>([]);
-    // 只在流结束后同步 model messages（流式期间不需要频繁更新）
+    // 流结束后：同步 model messages、清除重试回调、更新 tip
     useEffect(() => {
         if (chatStatus !== 'ready') return;
+        clearRetryCallback();
+        if (error) {
+            setTip({ type: 'error', message: error.message });
+        } else {
+            setTip(null);
+        }
         convertToModelMessages(displayMessages)
             .then(setModelMessages)
             .catch(() => setModelMessages([]));
-    }, [chatStatus, displayMessages]);
+    }, [chatStatus, displayMessages, error]);
+
+    // unmount 时清除全局回调
+    useEffect(() => () => clearRetryCallback(), []);
 
     const usage = usageRef.current;
     const modelId = modelIdRef.current;
@@ -239,6 +243,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
                 ]);
                 return;
             }
+            setTip(null);
             const expandedText = await expandMentions(text, fileIndex, cwd);
             sendMessage({ text: expandedText });
         },
@@ -315,6 +320,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
     const reset = useCallback(() => {
         stop();
         setMessages([]);
+        setTip(null);
     }, [stop, setMessages]);
 
     const cancel = useCallback(() => {
@@ -328,7 +334,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
         usage,
         modelId,
         pendingApproval,
-        error,
+        tip,
         send,
         approvePendingTool,
         alwaysApprovePendingTool,

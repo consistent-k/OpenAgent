@@ -1,9 +1,8 @@
 import { t } from '@oagent/i18n';
 import { Box, Text } from 'ink';
 import React from 'react';
-import { APP_NAME, getModelName } from '../../config';
+import { APP_NAME } from '../../config';
 import type { ChatStatus } from '../../hooks/useChatStream';
-import type { FileIndexStatus } from '../../hooks/useFileIndex';
 import { Divider } from '../text/Divider';
 import { useTheme } from '../text/theme';
 import { ThemedText } from '../text/ThemedText';
@@ -33,30 +32,16 @@ function MaydayBalls() {
 
 interface HeaderProps {
     status: ChatStatus;
-    fileIndexStatus: FileIndexStatus;
-    fileIndexCount: number;
     pendingApproval: boolean;
 }
 
-function fileIndexText(status: FileIndexStatus, count: number): { text: string; icon: 'loading' | 'error' | 'info' } {
-    if (status === 'indexing') return { text: t('status.header.indexing'), icon: 'loading' };
-    if (status === 'error') return { text: t('status.header.indexError'), icon: 'error' };
-    return { text: t('status.header.fileCount', { count }), icon: 'info' };
-}
-
-function safeModelName(): string {
-    return getModelName() || t('status.header.notConfigured');
-}
-
-export function Header({ status, fileIndexStatus, fileIndexCount, pendingApproval }: HeaderProps) {
+export function Header({ status, pendingApproval }: HeaderProps) {
     const { themeName } = useTheme();
     const runState = pendingApproval
         ? { text: t('status.header.awaitingApproval'), icon: 'warning' as const }
         : status === 'streaming'
           ? { text: t('status.header.streaming'), icon: 'loading' as const }
           : { text: t('status.header.idle'), icon: 'info' as const };
-
-    const indexInfo = fileIndexText(fileIndexStatus, fileIndexCount);
 
     return (
         <Box flexDirection="column">
@@ -68,12 +53,6 @@ export function Header({ status, fileIndexStatus, fileIndexCount, pendingApprova
                     {themeName === 'mayday' && <MaydayBalls />}
                 </Box>
                 <Box>
-                    <ThemedText color="textDim">{t('status.header.modelLabel')}</ThemedText>
-                    <ThemedText color="accent">{safeModelName()}</ThemedText>
-                    <ThemedText color="subtle"> | </ThemedText>
-                    <StatusIcon status={indexInfo.icon} />
-                    <ThemedText color="textDim">{indexInfo.text}</ThemedText>
-                    <ThemedText color="subtle"> | </ThemedText>
                     <StatusIcon status={runState.icon} />
                     <ThemedText color="textDim">{runState.text}</ThemedText>
                 </Box>

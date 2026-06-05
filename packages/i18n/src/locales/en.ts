@@ -245,6 +245,9 @@ export const en: Record<string, string> = {
     'update.success': '✅ Update complete! v{current} → v{newVersion}\nPlease restart oa to use the new version.',
     'update.failed': '❌ Update failed: {error}',
 
+    // ── Tips ──
+    'tips.retrying': '⚠ 429 rate limited, retrying ({attempt}/{max}) waiting {delay}s…',
+
     // ── CLI ──
     'cli.description': 'OpenAgent - Terminal AI Agent Client',
     'cli.updateDescription': 'Globally update oa to the latest version via npm/pnpm/yarn'
