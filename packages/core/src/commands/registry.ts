@@ -14,7 +14,6 @@ export interface CommandContext {
     resetSession: () => void;
     saveCurrentSession: () => Promise<void>;
     newSessionId: () => void;
-    cancelResponse: () => void;
     reloadFileIndex: () => Promise<number>;
     exit: () => void;
     listCommands: () => SlashCommand[];

@@ -1,201 +1,101 @@
-import { t } from '@oagent/i18n';
 import { Box, useInput } from 'ink';
-import TextInput from 'ink-text-input';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { COMMANDS, findCommand, type SlashCommand } from '../../commands';
-import type { ProviderConfig } from '../../config';
-import type { PendingToolApproval } from '../../hooks/useChatStream';
-import { getActiveMention, filterFiles, type FileEntry } from '../../utils/files';
-import type { SessionSummary } from '../../utils/sessions';
+import type { ReactNode } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { COMMANDS } from '../../commands';
+import { filterFiles, getActiveMention, type FileEntry } from '../../utils/files';
 import { Divider } from '../text/Divider';
-import type { ThemeName } from '../text/theme';
 import { ThemedBox } from '../text/ThemedBox';
 import { ThemedText } from '../text/ThemedText';
-import { CommandInput } from './CommandInput';
-import { type ConfigItem } from './ConfigPicker';
+import { CommandPalette } from './CommandPalette';
 import { FileMentionInput } from './FileMentionInput';
-import { OverlaySlot } from './OverlaySlot';
+import { ThemedInput } from './ThemedInput';
+import type { InputMode } from './useInputMode';
 import { useInputMode } from './useInputMode';
 
+// ---- Props: 7 down from 29 ----
 interface InputProps {
-    // Text input (4)
     value: string;
     onChange: (v: string) => void;
     onSubmit: (v: string, highlightedCommand?: string) => void;
     disabled: boolean;
-    // File index (1)
     fileIndex: FileEntry[];
-    // Approval (5)
-    pendingApproval: PendingToolApproval | null;
-    onApprove: () => void;
-    onAlwaysApprove: () => void;
-    onDeny: (reason?: string) => void;
-    onSelectOption: (optionText: string) => void;
-    // Picker triggers + callbacks (6)
-    sessionPicker: SessionSummary[] | null;
-    onSelectSession: (name: string) => void;
-    onDeleteSession: (name: string) => void;
-    themePicker: ThemeName | null;
-    onSelectTheme: (name: ThemeName) => void;
-    configPicker: ConfigItem[] | null;
-    onSaveConfig: (key: string, value: string) => void;
-    onManageProviders: () => void;
-    onBackToConfig: () => void;
-    // Provider picker
-    providerPickerOpen: boolean;
-    providerList: ProviderConfig[];
-    activeProviderName: string;
-    onAddProvider: (provider: ProviderConfig) => void;
-    onUpdateProvider: (name: string, updates: Partial<Omit<ProviderConfig, 'name'>> & { newName?: string }) => void;
-    onDeleteProvider: (name: string) => void;
-    onSetActiveProvider: (name: string) => void;
-    onAddModel: (providerName: string, modelName: string) => void;
-    onDeleteModel: (providerName: string, modelName: string) => void;
-    onCancelPicker: () => void;
+    mode: InputMode;
+    children?: ReactNode;
 }
 
-export function Input({
-    value,
-    onChange,
-    onSubmit,
-    disabled,
-    fileIndex,
-    pendingApproval,
-    onApprove,
-    onAlwaysApprove,
-    onDeny,
-    onSelectOption,
-    sessionPicker,
-    onSelectSession,
-    onDeleteSession,
-    themePicker,
-    onSelectTheme,
-    configPicker,
-    onSaveConfig,
-    onManageProviders,
-    onBackToConfig,
-    providerPickerOpen,
-    providerList,
-    activeProviderName,
-    onAddProvider,
-    onUpdateProvider,
-    onDeleteProvider,
-    onSetActiveProvider,
-    onAddModel,
-    onDeleteModel,
-    onCancelPicker
-}: InputProps) {
-    // Command filtering
+export function Input({ value, onChange, onSubmit, disabled, fileIndex, mode, children }: InputProps) {
+    // ---- Internal state ----
     const [commandIndex, setCommandIndex] = useState(0);
-    const filteredCommands = useMemo<SlashCommand[]>(() => {
+    const [fileIndexState, setFileIndexState] = useState(0);
+
+    // ---- Derived data ----
+    const filteredCommands = useMemo(() => {
+        if (!value.startsWith('/') || /\s/.test(value)) return [];
         if (value === '/') return COMMANDS;
-        if (value.startsWith('/') && !/\s/.test(value)) return COMMANDS.filter((c) => c.name.startsWith(value));
-        return [];
+        return COMMANDS.filter((cmd) => cmd.name.startsWith(value));
     }, [value]);
 
-    // File mention filtering
-    const [fileSelectedIndex, setFileSelectedIndex] = useState(0);
-    const activeMention = useMemo(() => getActiveMention(value), [value]);
-    const fileMatches = useMemo<FileEntry[]>(() => {
+    const fileMatches = useMemo(() => {
+        const activeMention = getActiveMention(value);
         if (!activeMention) return [];
-        return filterFiles(fileIndex, activeMention.query);
-    }, [activeMention, fileIndex]);
+        return filterFiles(fileIndex, activeMention.query, 10);
+    }, [value, fileIndex]);
 
-    // Mode state machine
-    const { mode, overlayType, resetKey, swallowRef } = useInputMode({
+    // ---- Callbacks ----
+    const handleCommandSelect = useCallback(
+        (name: string) => {
+            onChange(name + ' ');
+            setCommandIndex(0);
+        },
+        [onChange]
+    );
+
+    const handleFileSelect = useCallback(
+        (insert: string) => {
+            const mention = getActiveMention(value);
+            if (!mention) return;
+            const before = value.slice(0, mention.start);
+            const end = mention.start + 1 + mention.query.length;
+            const after = value.slice(end);
+            onChange(before + insert + after);
+            setFileIndexState(0);
+        },
+        [value, onChange]
+    );
+
+    // ---- Mode detection hook (resetKey + swallowRef + keyboard handling) ----
+    const { resetKey, swallowRef } = useInputMode({
+        mode,
         value,
         disabled,
-        pendingApproval,
-        sessionPicker,
-        themePicker,
-        configPicker,
-        providerPicker: providerPickerOpen,
         filteredCommands,
         fileMatches,
         commandIndex,
-        fileIndex: fileSelectedIndex,
-        onCommandSelect: useCallback(
-            (name: string) => {
-                onChange(name + ' ');
-                setCommandIndex(0);
-            },
-            [onChange]
-        ),
-        onFileSelect: useCallback(
-            (insert: string) => {
-                const mention = getActiveMention(value);
-                if (mention) {
-                    const before = value.slice(0, mention.start);
-                    onChange(before + insert);
-                }
-                setFileSelectedIndex(0);
-            },
-            [onChange, value]
-        ),
-        onCancelPicker
+        fileIndex: fileIndexState,
+        onCommandSelect: handleCommandSelect,
+        onFileSelect: handleFileSelect
     });
 
-    // Reset selection indices when query changes
-    useEffect(() => {
-        setCommandIndex(0);
-    }, [value]);
-
-    useEffect(() => {
-        setFileSelectedIndex(0);
-    }, [activeMention?.query]);
-
-    // Detect command prefix for inline highlighting (must be before early returns to preserve hook order)
-    const commandPrefix = useMemo(() => {
-        if (!value.startsWith('/')) return null;
-        const spaceIdx = value.indexOf(' ');
-        if (spaceIdx < 0) return null;
-        const cmdName = value.slice(0, spaceIdx);
-        if (!findCommand(cmdName)) return null;
-        return cmdName;
-    }, [value]);
-
-    // Allow backspace when command-highlighted with empty args to clear and re-enter command mode
-    const isCommandEmptyArgs = commandPrefix !== null && value.length === commandPrefix.length + 1;
+    // ---- Command mode: arrow key selection + Enter submit ----
     useInput(
         (_input, key) => {
-            if ((key.backspace || key.delete) && isCommandEmptyArgs) {
+            if (key.upArrow) {
+                setCommandIndex((i) => Math.max(0, i - 1));
+            } else if (key.downArrow) {
+                setCommandIndex((i) => Math.min(filteredCommands.length - 1, i + 1));
+            } else if (key.return) {
+                const highlighted = filteredCommands[commandIndex]?.name;
+                onSubmit(value, highlighted);
                 onChange('');
             }
         },
-        { isActive: !disabled && mode === 'text' && isCommandEmptyArgs }
+        { isActive: mode === 'command' }
     );
 
+    // ---- Render ----
     // Overlay mode: render overlay exclusively
-    if (overlayType) {
-        return (
-            <OverlaySlot
-                overlayType={overlayType}
-                pendingApproval={pendingApproval}
-                onApprove={onApprove}
-                onAlwaysApprove={onAlwaysApprove}
-                onDeny={onDeny}
-                onSelectOption={onSelectOption}
-                sessionPicker={sessionPicker}
-                onSelectSession={onSelectSession}
-                onDeleteSession={onDeleteSession}
-                themePicker={themePicker}
-                onSelectTheme={onSelectTheme}
-                configPicker={configPicker}
-                onSaveConfig={onSaveConfig}
-                onManageProviders={onManageProviders}
-                onBackToConfig={onBackToConfig}
-                providerPickerOpen={providerPickerOpen}
-                providerList={providerList}
-                activeProviderName={activeProviderName}
-                onAddProvider={onAddProvider}
-                onUpdateProvider={onUpdateProvider}
-                onDeleteProvider={onDeleteProvider}
-                onSetActiveProvider={onSetActiveProvider}
-                onAddModel={onAddModel}
-                onDeleteModel={onDeleteModel}
-                onCancelPicker={onCancelPicker}
-            />
-        );
+    if (mode === 'approval' || mode === 'session' || mode === 'theme' || mode === 'config' || mode === 'provider') {
+        return <>{children}</>;
     }
 
     // Disabled mode
@@ -204,16 +104,34 @@ export function Input({
             <Box flexDirection="column">
                 <ThemedBox borderColor="border" paddingX={1}>
                     <ThemedText color="textDim">{'> '}</ThemedText>
-                    <ThemedText color="textDim">{value || t('ui.input.aiResponding')}</ThemedText>
+                    <ThemedText color="textDim">{value || 'Waiting for response...'}</ThemedText>
                 </ThemedBox>
                 <Divider color="border" />
             </Box>
         );
     }
 
-    // Command mode
+    // Command mode: ThemedInput + CommandPalette
     if (mode === 'command') {
-        return <CommandInput value={value} onChange={onChange} onSubmit={onSubmit} swallowRef={swallowRef} selectedIndex={commandIndex} onSelectedIndexChange={setCommandIndex} />;
+        return (
+            <Box flexDirection="column">
+                <ThemedInput
+                    value={value}
+                    onChange={(v) => {
+                        onChange(v);
+                        setCommandIndex(0);
+                    }}
+                    onSubmit={(text) => {
+                        const highlighted = filteredCommands[commandIndex]?.name;
+                        onSubmit(text, highlighted);
+                        onChange('');
+                    }}
+                    swallowRef={swallowRef}
+                />
+                <Divider color="border" />
+                {value.startsWith('/') && <CommandPalette commands={filteredCommands} selectedIndex={commandIndex} />}
+            </Box>
+        );
     }
 
     // File mention mode
@@ -222,44 +140,19 @@ export function Input({
             <FileMentionInput
                 value={value}
                 onChange={onChange}
-                onSubmit={(v) => onSubmit(v)}
+                onSubmit={() => onSubmit(value)}
                 fileIndex={fileIndex}
                 swallowRef={swallowRef}
-                selectedIndex={fileSelectedIndex}
-                onSelectedIndexChange={setFileSelectedIndex}
+                selectedIndex={fileIndexState}
+                onSelectedIndexChange={setFileIndexState}
             />
         );
     }
 
-    // Normal text mode (with optional command-prefix highlighting)
-    const makeSwallowHandler = (base: string, apply: (v: string) => void) => (v: string) => {
-        const c = swallowRef.current;
-        if (c && v === base + c) {
-            swallowRef.current = null;
-            return;
-        }
-        swallowRef.current = null;
-        apply(v);
-    };
-
-    const argsValue = commandPrefix ? value.slice(commandPrefix.length + 1) : value;
-    const handleChange = commandPrefix ? makeSwallowHandler(argsValue, (v) => onChange(commandPrefix + ' ' + v)) : makeSwallowHandler(value, (v) => onChange(v));
-    const handleSubmit = commandPrefix ? (v: string) => onSubmit(commandPrefix + ' ' + v) : (v: string) => onSubmit(v);
-
+    // Normal text mode
     return (
         <Box flexDirection="column">
-            <ThemedBox borderColor="border" paddingX={1}>
-                <ThemedText color="accent">{'> '}</ThemedText>
-                {commandPrefix && (
-                    <>
-                        <ThemedText color="suggestion" bold>
-                            {commandPrefix}
-                        </ThemedText>
-                        <ThemedText> </ThemedText>
-                    </>
-                )}
-                <TextInput key={resetKey} value={argsValue} onChange={handleChange} onSubmit={handleSubmit} />
-            </ThemedBox>
+            <ThemedInput key={resetKey} value={value} onChange={onChange} onSubmit={(text) => onSubmit(text)} swallowRef={swallowRef} />
             <Divider color="border" />
         </Box>
     );

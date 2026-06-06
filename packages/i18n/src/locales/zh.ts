@@ -58,8 +58,6 @@ export const zh: Record<string, string> = {
     'command.reload.refreshing': '正在刷新文件索引...',
     'command.reload.refreshed': '文件索引已刷新：{count} 项',
 
-    'command.cancel.description': '停止当前正在流式生成的回复',
-
     'command.approvals.description': '管理工具审批偏好（始终批准 / 撤销）',
     'command.approvals.label.executeBash': 'Bash 命令执行',
     'command.approvals.label.writeFile': '文件写入',

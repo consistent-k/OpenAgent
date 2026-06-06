@@ -58,8 +58,6 @@ export const en: Record<string, string> = {
     'command.reload.refreshing': 'Refreshing file index...',
     'command.reload.refreshed': 'File index refreshed: {count} items',
 
-    'command.cancel.description': 'Stop the currently streaming response',
-
     'command.approvals.description': 'Manage tool approval preferences (always approve / revoke)',
     'command.approvals.label.executeBash': 'Bash command execution',
     'command.approvals.label.writeFile': 'File writing',

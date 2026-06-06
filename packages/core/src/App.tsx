@@ -22,6 +22,9 @@ import { useFileIndex } from './hooks/useFileIndex';
 import { useLocaleSetup } from './hooks/useLocaleSetup';
 import type { ConfigItem } from './ui/chat/ConfigPicker';
 import { Input } from './ui/chat/Input';
+import { ApprovalDialog, SessionPicker, ThemePicker, ConfigPicker, ProviderPicker } from './ui/chat/overlays';
+import type { OverlayState } from './ui/chat/useInputMode';
+import { getMode } from './ui/chat/useInputMode';
 import { MessageList } from './ui/messages/MessageList';
 import { PartRenderer } from './ui/messages/PartRenderer';
 import { Header } from './ui/status/Header';
@@ -30,7 +33,6 @@ import { Tips } from './ui/status/Tips';
 import { ThemeProvider, useTheme, type ThemeName } from './ui/text/theme';
 import { getErrorMessage } from './utils/errors';
 import { appendHistory, deleteSession, listSessions, loadSession, saveSession } from './utils/sessions';
-import type { SessionSummary } from './utils/sessions';
 import { uid } from './utils/uid';
 
 export function App() {
@@ -70,11 +72,17 @@ function AppContent() {
     const [inputValue, setInputValue] = useState('');
     const [showReasoning, setShowReasoning] = useState(false);
     const [showToolDetails, setShowToolDetails] = useState(false);
-    const [sessionPicker, setSessionPicker] = useState<SessionSummary[] | null>(null);
-    const [themePickerOpen, setThemePickerOpen] = useState(false);
-    const [configPickerOpen, setConfigPickerOpen] = useState(false);
-    const [providerPickerOpen, setProviderPickerOpen] = useState(false);
+    const [overlay, setOverlay] = useState<OverlayState>(null);
     const [providerList, setProviderList] = useState<ProviderConfig[]>([]);
+
+    // 当 pendingApproval 变化时，同步到 overlay 状态（优先级最高）
+    useEffect(() => {
+        setOverlay((prev) => {
+            if (pendingApproval) return { type: 'approval', data: pendingApproval };
+            if (prev?.type === 'approval') return null;
+            return prev;
+        });
+    }, [pendingApproval]);
 
     const refreshProviderList = useCallback(() => {
         setProviderList(getProviders());
@@ -119,8 +127,6 @@ function AppContent() {
         ];
     }, []);
 
-    const [configItems, setConfigItems] = useState<ConfigItem[]>([]);
-
     const handleSaveConfig = useCallback(
         (key: string, value: string) => {
             try {
@@ -139,8 +145,7 @@ function AppContent() {
                     saveConfig({ locale: value });
                 }
                 reloadConfig();
-                setConfigItems(getConfigItems());
-                setConfigPickerOpen(false);
+                setOverlay(null);
                 setInputValue('');
                 appendMessages([
                     { id: uid(), role: 'user', parts: [{ type: 'text', text: `/config` }] },
@@ -158,14 +163,11 @@ function AppContent() {
 
     const handleManageProviders = useCallback(() => {
         refreshProviderList();
-        setConfigPickerOpen(false);
-        setProviderPickerOpen(true);
+        setOverlay({ type: 'provider' });
     }, [refreshProviderList]);
 
     const handleBackToConfig = useCallback(() => {
-        setProviderPickerOpen(false);
-        setConfigItems(getConfigItems());
-        setConfigPickerOpen(true);
+        setOverlay({ type: 'config', data: getConfigItems() });
     }, [getConfigItems]);
 
     const handleAddProvider = useCallback(
@@ -295,10 +297,7 @@ function AppContent() {
     );
 
     const handleCancelPicker = useCallback(() => {
-        setSessionPicker(null);
-        setThemePickerOpen(false);
-        setConfigPickerOpen(false);
-        setProviderPickerOpen(false);
+        setOverlay(null);
     }, []);
 
     const lastIdx = displayMessages.length - 1;
@@ -306,6 +305,8 @@ function AppContent() {
     const isStreaming = status === 'streaming' && lastMessage?.role === 'assistant';
     const historyMessages = isStreaming ? displayMessages.slice(0, -1) : displayMessages;
     const streamingMessage = isStreaming ? lastMessage : null;
+    const disabled = status === 'streaming';
+    const mode = getMode(overlay, disabled, inputValue);
 
     const saveCurrentSession = useCallback(async () => {
         if (displayMessages.length === 0) return;
@@ -326,7 +327,7 @@ function AppContent() {
             } catch {
                 // ignore
             }
-            setSessionPicker(null);
+            setOverlay(null);
             setInputValue('');
         },
         [setSession, saveCurrentSession]
@@ -336,7 +337,7 @@ function AppContent() {
         async (sessionId: string) => {
             await deleteSession(sessionId);
             const updated = await listSessions(cwd);
-            setSessionPicker(updated.length > 0 ? updated : null);
+            setOverlay(updated.length > 0 ? { type: 'session', data: updated } : null);
         },
         [cwd]
     );
@@ -344,7 +345,7 @@ function AppContent() {
     const handleSelectTheme = useCallback(
         (name: ThemeName) => {
             setThemeName(name);
-            setThemePickerOpen(false);
+            setOverlay(null);
             setInputValue('');
             appendMessages([
                 { id: uid(), role: 'user', parts: [{ type: 'text', text: `/theme` }] },
@@ -401,21 +402,19 @@ function AppContent() {
                         saveCurrentSession,
                         newSessionId,
                         resetSession: reset,
-                        cancelResponse: cancel,
                         reloadFileIndex,
                         exit,
                         listCommands: () => COMMANDS,
-                        showSessionPicker: setSessionPicker,
+                        showSessionPicker: (sessions) => setOverlay(sessions ? { type: 'session', data: sessions } : null),
                         themeName,
                         setThemeName: (name) => setThemeName(name),
-                        showThemePicker: () => setThemePickerOpen(true),
+                        showThemePicker: () => setOverlay({ type: 'theme', data: themeName }),
                         showConfigPicker: () => {
-                            setConfigItems(getConfigItems());
-                            setConfigPickerOpen(true);
+                            setOverlay({ type: 'config', data: getConfigItems() });
                         },
                         showProviderPicker: () => {
                             refreshProviderList();
-                            setProviderPickerOpen(true);
+                            setOverlay({ type: 'provider' });
                         }
                     });
                 } catch (error) {
@@ -446,10 +445,10 @@ function AppContent() {
             cancel,
             saveCurrentSession,
             newSessionId,
-            setSessionPicker,
             themeName,
             setThemeName,
-            getConfigItems
+            getConfigItems,
+            setOverlay
         ]
     );
 
@@ -467,37 +466,33 @@ function AppContent() {
                 </Box>
             )}
             <Tips tip={tip} />
-            <Input
-                value={inputValue}
-                onChange={setInputValue}
-                onSubmit={handleSubmit}
-                disabled={status === 'streaming'}
-                fileIndex={fileIndex}
-                pendingApproval={pendingApproval}
-                onApprove={approvePendingTool}
-                onAlwaysApprove={alwaysApprovePendingTool}
-                onDeny={denyPendingTool}
-                onSelectOption={selectQuestionOption}
-                sessionPicker={sessionPicker}
-                onSelectSession={handleSelectSession}
-                onDeleteSession={handleDeleteSession}
-                themePicker={themePickerOpen ? themeName : null}
-                onSelectTheme={handleSelectTheme}
-                configPicker={configPickerOpen ? configItems : null}
-                onSaveConfig={handleSaveConfig}
-                onManageProviders={handleManageProviders}
-                onBackToConfig={handleBackToConfig}
-                providerPickerOpen={providerPickerOpen}
-                providerList={providerList}
-                activeProviderName={getActiveProviderName()}
-                onAddProvider={handleAddProvider}
-                onUpdateProvider={handleUpdateProvider}
-                onDeleteProvider={handleDeleteProvider}
-                onSetActiveProvider={handleSetActiveProvider}
-                onAddModel={handleAddModel}
-                onDeleteModel={handleDeleteModel}
-                onCancelPicker={handleCancelPicker}
-            />
+            <Input value={inputValue} onChange={setInputValue} onSubmit={handleSubmit} disabled={disabled} fileIndex={fileIndex} mode={mode}>
+                {overlay?.type === 'approval' && pendingApproval && (
+                    <ApprovalDialog
+                        pending={pendingApproval}
+                        onApprove={approvePendingTool}
+                        onAlwaysApprove={alwaysApprovePendingTool}
+                        onDeny={denyPendingTool}
+                        onSelectOption={selectQuestionOption}
+                    />
+                )}
+                {overlay?.type === 'session' && <SessionPicker sessions={overlay.data} onSelect={handleSelectSession} onCancel={handleCancelPicker} onDelete={handleDeleteSession} />}
+                {overlay?.type === 'theme' && <ThemePicker current={overlay.data} onSelect={handleSelectTheme} onCancel={handleCancelPicker} />}
+                {overlay?.type === 'config' && <ConfigPicker items={overlay.data} onSave={handleSaveConfig} onCancel={handleCancelPicker} onManageProviders={handleManageProviders} />}
+                {overlay?.type === 'provider' && (
+                    <ProviderPicker
+                        providers={providerList}
+                        activeProviderName={getActiveProviderName()}
+                        onAdd={handleAddProvider}
+                        onUpdate={handleUpdateProvider}
+                        onDelete={handleDeleteProvider}
+                        onSetActive={handleSetActiveProvider}
+                        onAddModel={handleAddModel}
+                        onDeleteModel={handleDeleteModel}
+                        onBack={handleBackToConfig}
+                    />
+                )}
+            </Input>
             <StatusBar cwd={cwd} modelId={modelId} usage={usage} />
         </Box>
     );
