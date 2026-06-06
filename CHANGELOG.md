@@ -2,6 +2,29 @@
 
 本文档记录 OpenAgent 的所有重要变更。
 
+### [1.0.5](https://github.com/consistent-k/OpenAgent/compare/v1.0.4...v1.0.5) (2026-06-06)
+
+### 🐛 Bug 修复
+
+- 修复 /update 命令阻塞 TUI 的问题 ([2cddd94](https://github.com/consistent-k/OpenAgent/commit/2cddd9427d82debe2a99d4d3c6adef5d95229759))
+- 修复 ESLint 与 Renovate 配置问题 ([07839f2](https://github.com/consistent-k/OpenAgent/commit/07839f2deb8e3c0524463156e8de2160f56c55ed))
+
+### ✨ 新功能
+
+- 429 限流重试信息展示与 Tips 组件 ([60c2ac5](https://github.com/consistent-k/OpenAgent/commit/60c2ac5f10b2b69fa4a5a530c92433cb1170a3fa))
+- 多供应商配置与 Provider/Model 选择器 ([bbe2608](https://github.com/consistent-k/OpenAgent/commit/bbe26083cf8f17d00c3e012900777d170697e35a))
+
+### ♻️ 重构
+
+- 统一 overlay 状态管理，简化 Input 组件 props ([809f3c3](https://github.com/consistent-k/OpenAgent/commit/809f3c38eb3193e59ae0ebb8a39695d90b1d7aaa))
+- 重构发包脚本，自动发现所有 workspace 包 ([bac8f67](https://github.com/consistent-k/OpenAgent/commit/bac8f671f950ff7fb82df5f94554c2f088089eb5))
+
+### 📚 文档
+
+- 同步项目结构文档，抽离为单一维护点 ([225deab](https://github.com/consistent-k/OpenAgent/commit/225deabab3c3cdacbd125c5682fb153f5a7be581))
+
+- 用 standard-version 替换手动版本管理 ([e2c2db5](https://github.com/consistent-k/OpenAgent/commit/e2c2db501852f52e6486720e2ae6ea69ec577da6))
+
 ## [1.0.4](https://github.com/consistent-k/OpenAgent/compare/v1.0.3...v1.0.4) (2026-06-04)
 
 ### ✨ 新功能

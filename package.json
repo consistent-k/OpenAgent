@@ -21,7 +21,7 @@
         "typecheck": "pnpm -r typecheck",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "release": "standard-version",
+        "release": "bash scripts/release.sh",
         "release:minor": "standard-version --release-as minor",
         "release:major": "standard-version --release-as major",
         "release:patch": "standard-version --release-as patch",
