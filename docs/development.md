@@ -70,50 +70,7 @@ pnpm format
 
 ## 项目结构
 
-```
-packages/
-├── core/               # @oagent/core — 主应用
-│   └── src/
-│       ├── index.tsx           # 入口
-│       ├── App.tsx             # 主组件（编排聊天流、命令处理、会话保存）
-│       ├── config/             # 配置管理（baseUrl、apiKey、model、maxSteps、channels）
-│       ├── hooks/              # useChatStream / useFileIndex
-│       ├── commands/           # 斜杠命令（registry 模式，每个命令一个文件）
-│       ├── engine/              # AI 引擎（agents、tools、skill、config）
-│       │   ├── index.ts        # 公共 API：导出 runAgent、getProvider、getSystemPrompt
-│       │   ├── agents/
-│       │   │   └── index.ts    # runAgent() 核心 AI 循环
-│       │   ├── config/
-│       │   │   ├── provider.ts     # AI SDK provider 配置
-│       │   │   └── system-prompt.ts # 系统提示词动态生成
-│       │   ├── skill/          # Skill 系统（experimental_createSkillTool）
-│       │   └── tools/          # AI 工具（每个工具一个文件夹）
-│       │       ├── index.ts    # 工具注册表
-│       │       └── utils/      # approval-store.ts, write-file.ts
-│       ├── ui/                 # Ink UI 组件
-│       │   ├── chat/           # 聊天交互（Input、ApprovalDialog、ConfigPicker、OverlaySlot 等）
-│       │   ├── messages/       # 消息渲染（TextPart、ToolCallPart、ToolCallGroup、FilePart 等）
-│       │   ├── status/         # 状态栏（Header、StatusBar、StatusIcon）
-│       │   └── text/           # 文本 & 主题基础组件（Markdown、MarkdownTable、ThemedBox 等）
-│       └── utils/              # 工具函数（files、sessions、safe-path、walk、fs、highlight 等）
-├── channels/           # @oagent/channels — Channel SDK
-│   └── src/
-│       ├── index.ts            # 入口（导出 Channel、ChannelManager、SessionManager）
-│       ├── types.ts            # Channel 接口定义
-│       ├── manager.ts          # ChannelManager 单例
-│       └── session.ts          # SessionManager 会话管理
-└── weixin/             # @oagent/weixin — 微信插件
-    └── src/
-        ├── index.ts            # register() 插件入口
-        ├── channel.ts          # WeixinChannel 实现
-        ├── auth/               # 账号凭证管理 + 扫码登录
-        ├── api/                # iLink 协议 HTTP 客户端 + 端点函数
-        ├── messaging/          # 消息适配、发送、Markdown 过滤
-        ├── monitor/            # 消息监控主循环（长轮询）
-        ├── storage/            # 上下文 token 和 sync-buf 游标持久化
-        ├── types/              # iLink 协议类型 + 插件接口类型
-        └── utils/              # 日志、ID 生成、日志脱敏
-```
+完整项目结构参见 [project-structure.md](project-structure.md)。
 
 ## 添加新命令
 

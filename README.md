@@ -6,12 +6,14 @@
 
 - 内置工具：读写文件、执行命令、代码搜索（glob/grep）、网页搜索、文件抓取等
 - `@文件` 补全：输入 `@` 即可模糊搜索并补全项目文件路径
-- 斜杠命令：`/clear`、`/load`、`/config`、`/theme` 等快捷操作
+- 斜杠命令：`/clear`、`/config`、`/theme`、`/locale`、`/update` 等快捷操作
 - 交互式确认：写入文件等敏感操作前弹出确认框，由你决定是否执行
 - 会话管理：自动保存历史会话，随时恢复上下文继续对话
 - 流式响应：实时展示 AI 的思考过程和工具调用细节
 - Skill 系统：从 `~/.agents/skills` 目录加载自定义 Skill，扩展 Agent 的能力
-- Channel 插件：通过插件系统接入微信等消息平台，实现远程控制
+- 国际化：内置中文/英文界面，支持第三方语言扩展包
+- Channel 插件：通过插件系统接入微信、Telegram 等消息平台，实现远程控制
+- 自更新：`/update` 命令一键检查并更新到最新版本
 
 ## 快速开始（安装版）
 
@@ -64,10 +66,12 @@ oa
 - `/tools`：列出 Agent 可调用的内置工具
 - `/theme`：切换主题
 - `/channel`：管理消息渠道（start/stop/login/logout/status）
+- `/locale`：查看当前语言或切换语言（zh/en）
 - `/reload`：刷新 `@文件` 补全索引
 - `/cancel`：停止当前正在流式生成的回复
 - `/sessions`：列出并恢复已保存会话
 - `/clear`：保存当前会话并开始新会话
+- `/update`：检查并更新 oa 到最新版本
 - `/exit`：保存会话、停止所有渠道、退出
 
 > 每次 `/clear` 时自动保存当前会话到 `~/.openagent/sessions/<sessionId>.json`，历史记录追加到 `~/.openagent/history.jsonl`。
@@ -76,11 +80,20 @@ oa
 
 OA 支持通过插件接入消息平台（微信、Telegram 等），实现远程与 AI 对话。
 
+### 内置插件
+
+| 插件     | 包名               | 说明                  |
+| -------- | ------------------ | --------------------- |
+| 微信     | `@oagent/weixin`   | iLink 协议接入微信    |
+| Telegram | `@oagent/telegram` | Telegram Bot API 接入 |
+
 ### 安装插件
 
 ```bash
 # 在使用 OA 的项目目录下安装
 pnpm add @oagent/weixin
+# 或
+pnpm add @oagent/telegram
 ```
 
 ### 启用插件
@@ -89,9 +102,8 @@ pnpm add @oagent/weixin
 
 ```json
 {
-    "baseUrl": "https://api.example.com/v1",
-    "apiKey": "sk-...",
-    "model": "gpt-4.1",
+    "providers": [...],
+    "activeModel": "...",
     "channels": ["@oagent/weixin"]
 }
 ```
@@ -104,9 +116,30 @@ pnpm add @oagent/weixin
 /channel stop weixin      # 停止微信机器人
 ```
 
-启动后，微信收到的消息会实时显示在 TUI 中，AI 的回复也会同步发送到微信。
+启动后，收到的消息会实时显示在 TUI 中，AI 的回复也会同步发送到对应平台。
 
 > 开发自定义插件请参阅 [docs/development.md](docs/development.md)。
+
+## 国际化
+
+OA 内置中文和英文界面，默认为中文。使用 `/locale` 命令查看和切换语言：
+
+```
+/locale                   # 查看当前语言和可用语言列表
+/locale en                # 切换到英文
+/locale zh                # 切换到中文
+```
+
+也支持通过第三方语言扩展包添加更多语言，在 `config.json` 中配置：
+
+```json
+{
+    "locale": {
+        "lang": "ja",
+        "plugins": ["@oagent/locale-ja"]
+    }
+}
+```
 
 ## 技术文档
 
