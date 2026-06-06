@@ -1,6 +1,6 @@
 {
     "name": "@oagent/oa",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "main": "./dist/index.js",
     "type": "module",
     "private": false,
@@ -21,7 +21,12 @@
         "typecheck": "pnpm -r typecheck",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "version:all": "bash scripts/version.sh",
+        "release": "standard-version",
+        "release:minor": "standard-version --release-as minor",
+        "release:major": "standard-version --release-as major",
+        "release:patch": "standard-version --release-as patch",
+        "release:first": "standard-version --first-release",
+        "release:dry": "standard-version --dry-run",
         "publish:all": "bash scripts/publish.sh",
         "prepare": "husky",
         "commit": "git-cz"
@@ -43,10 +48,10 @@
         "@oagent/core": "workspace:*"
     },
     "devDependencies": {
-        "@oagent/telegram": "workspace:*",
-        "@oagent/weixin": "workspace:*",
         "@commitlint/cli": "^21.0.2",
         "@commitlint/config-conventional": "^21.0.2",
+        "@oagent/telegram": "workspace:*",
+        "@oagent/weixin": "workspace:*",
         "@types/node": "^25.9.1",
         "commitizen": "^4.3.1",
         "cz-conventional-changelog": "^3.3.0",
@@ -57,6 +62,7 @@
         "husky": "^9.1.7",
         "lint-staged": "^17.0.7",
         "prettier": "^3.8.1",
+        "standard-version": "^9.5.0",
         "tsup": "^8.5.1",
         "tsx": "^4.22.4",
         "typescript": "^6.0.2",
