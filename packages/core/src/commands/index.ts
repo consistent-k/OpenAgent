@@ -1,3 +1,4 @@
+import { agentsCommand } from './agents';
 import { approvalsCommand } from './approvals';
 import { channelCommand } from './channel';
 import { clearCommand } from './clear';
@@ -18,6 +19,7 @@ export const COMMANDS: SlashCommand[] = [
     statusCommand,
     configCommand,
     approvalsCommand,
+    agentsCommand,
     themeCommand,
     toolsCommand,
     channelCommand,

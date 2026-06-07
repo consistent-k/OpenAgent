@@ -90,6 +90,10 @@ export const en: Record<string, string> = {
     'command.locale.switched': 'Language switched: {locale}',
     'command.locale.unknown': 'Unknown language: {locale}. Available: {locales}',
 
+    'command.agents.description': 'List available sub-agents',
+    'command.agents.title': 'Available Agents',
+    'command.agents.none': 'No sub-agents registered. Define agents in AGENTS.md or config.json.',
+
     // ── UI components ──
     'ui.approval.approve': 'Approve',
     'ui.approval.alwaysApprove': 'Always approve this type',
@@ -198,6 +202,12 @@ export const en: Record<string, string> = {
     'tool.state.executing': 'executing',
     'tool.state.error': 'error',
     'tool.state.denied': 'denied',
+
+    'tool.agent.parallel': 'Parallel Execution',
+    'tool.agent.handoff': 'Agent Handoff',
+    'tool.agent.preparing': 'Preparing...',
+    'tool.agent.pending': 'Waiting',
+    'tool.agent.running': 'Running',
     'tool.result.denied': 'denied',
     'tool.result.checkmark': '✓',
     'tool.result.moreLines': '... ({count} more lines)',

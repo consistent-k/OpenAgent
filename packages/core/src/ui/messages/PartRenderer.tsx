@@ -1,6 +1,8 @@
 import type { DynamicToolUIPart, SourceDocumentUIPart, SourceUrlUIPart, ToolUIPart, UIMessage } from 'ai';
+import { getToolName } from 'ai';
 import { Box } from 'ink';
 import React from 'react';
+import { AgentCallPart, isAgentTool } from './AgentCallPart';
 import { FilePart } from './FilePart';
 import { ReasoningPart } from './ReasoningPart';
 import { TextPart } from './TextPart';
@@ -15,6 +17,15 @@ interface PartRendererProps {
     showReasoning: boolean;
 }
 
+/** Render a tool part — dispatches to AgentCallPart or ToolCallPart based on tool name */
+function renderToolPart(key: string, part: DynamicToolUIPart | ToolUIPart) {
+    const toolName = getToolName(part);
+    if (isAgentTool(toolName)) {
+        return <AgentCallPart key={key} part={part} />;
+    }
+    return <ToolCallPart key={key} part={part} />;
+}
+
 export function PartRenderer({ part, partIndex, messageId, showReasoning }: PartRendererProps) {
     const key = `${messageId}-${partIndex}`;
     const { type } = part;
@@ -26,8 +37,9 @@ export function PartRenderer({ part, partIndex, messageId, showReasoning }: Part
         case 'reasoning': {
             return <ReasoningPart key={key} text={part.text} state={part.state} showReasoning={showReasoning} />;
         }
-        case 'dynamic-tool':
-            return <ToolCallPart key={key} part={part as DynamicToolUIPart} />;
+        case 'dynamic-tool': {
+            return renderToolPart(key, part as DynamicToolUIPart);
+        }
         case 'file': {
             return <FilePart key={key} mediaType={part.mediaType} url={part.url ?? ''} />;
         }
@@ -42,7 +54,7 @@ export function PartRenderer({ part, partIndex, messageId, showReasoning }: Part
         default:
             // 静态工具 (type: 'tool-*') 和未知类型 fallback
             if (type.startsWith('tool-')) {
-                return <ToolCallPart key={key} part={part as ToolUIPart} />;
+                return renderToolPart(key, part as ToolUIPart);
             }
             return <Box key={key} />;
     }

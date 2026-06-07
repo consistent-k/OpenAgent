@@ -29,6 +29,30 @@ export interface ProviderConfig {
     models: string[];
 }
 
+/** 用户自定义 Agent 配置（config.json 中的 agents 字段） */
+export interface UserAgentConfig {
+    /** 唯一 Agent ID */
+    id: string;
+    /** 显示名称 */
+    name?: string;
+    /** 描述，供主 Agent 理解何时委托 */
+    description?: string;
+    /** 该 Agent 的系统提示 */
+    systemPrompt: string;
+    /** 允许的工具名列表，省略则允许所有工具 */
+    allowedTools?: string[];
+    /** 模型覆盖，格式 "Provider/Model" */
+    model?: string;
+    /** 步数覆盖 */
+    maxSteps?: number;
+    /** 重试次数覆盖 */
+    maxRetries?: number;
+    /** 子工具调用是否需要审批 */
+    requireApproval?: boolean;
+    /** 标签 */
+    tags?: string[];
+}
+
 export interface OpenAgentConfig {
     /** 供应商列表 */
     providers?: ProviderConfig[];
@@ -44,6 +68,10 @@ export interface OpenAgentConfig {
         /** 语言扩展包名列表，如 ["@oagent/locale-ja"] */
         plugins?: string[];
     };
+    /** 用户自定义 Agent 配置 */
+    agents?: UserAgentConfig[];
+    /** Agent 插件包名列表，如 ["@oagent/custom-agents"] */
+    agentPlugins?: string[];
 
     // ---- 旧格式字段（仅用于向后兼容迁移检测） ----
     /** @deprecated 旧格式：顶层 baseUrl */
@@ -294,6 +322,16 @@ export function getConfiguredLocalePlugins(): string[] {
 /** 获取配置的语言设置，默认 'zh' */
 export function getConfigLocale(): string {
     return readConfig().locale?.lang ?? 'zh';
+}
+
+/** 获取用户自定义 Agent 配置列表 */
+export function getConfiguredAgents(): UserAgentConfig[] {
+    return readConfig().agents ?? [];
+}
+
+/** 获取配置的 Agent 插件包名列表 */
+export function getConfiguredAgentPlugins(): string[] {
+    return readConfig().agentPlugins ?? [];
 }
 
 /** 获取单个供应商 */

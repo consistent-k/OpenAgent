@@ -90,6 +90,10 @@ export const zh: Record<string, string> = {
     'command.locale.switched': '已切换语言：{locale}',
     'command.locale.unknown': '未知语言：{locale}。可用：{locales}',
 
+    'command.agents.description': '列出可用的子 Agent',
+    'command.agents.title': '可用 Agent',
+    'command.agents.none': '没有注册的子 Agent。可在 AGENTS.md 或 config.json 中定义。',
+
     // ── UI 组件 ──
     'ui.approval.approve': '批准执行',
     'ui.approval.alwaysApprove': '始终批准此类操作',
@@ -198,6 +202,12 @@ export const zh: Record<string, string> = {
     'tool.state.executing': 'executing',
     'tool.state.error': 'error',
     'tool.state.denied': 'denied',
+
+    'tool.agent.parallel': '并行执行',
+    'tool.agent.handoff': 'Agent 接力',
+    'tool.agent.preparing': '准备中...',
+    'tool.agent.pending': '等待中',
+    'tool.agent.running': '运行中',
     'tool.result.denied': 'denied',
     'tool.result.checkmark': '✓',
     'tool.result.moreLines': '... ({count} more lines)',
