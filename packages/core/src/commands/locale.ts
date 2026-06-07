@@ -1,5 +1,5 @@
 import { getLocale, getSupportedLocales, t } from '@oagent/i18n';
-import { saveConfig } from '../config';
+import { reloadConfig, saveLocale } from '../config';
 import { uid } from '../utils/uid';
 import type { SlashCommand } from './registry';
 
@@ -31,7 +31,8 @@ export const localeCommand: SlashCommand = {
                     })
                 );
             } else {
-                saveConfig({ locale: target });
+                saveLocale(target);
+                reloadConfig();
                 lines.push(t('command.locale.switched', { locale: found.label }));
             }
         }

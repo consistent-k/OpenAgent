@@ -96,6 +96,24 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
         );
     }
 
+    // ask_user_question with no options — show custom input directly
+    if (isQuestion && questionOptions.length === 0) {
+        return (
+            <Dialog
+                title={questionText || `${pending.toolName}(${summarizeArgs(pending.input)})`}
+                subtitle={t('ui.approval.customInputHint')}
+                isActive={false}
+                onConfirm={() => onSelectOption(customText)}
+                onCancel={() => onDeny(t('ui.approval.userCancelled'))}
+            >
+                <Box>
+                    <Text color="suggestion">{'❯ '}</Text>
+                    <TextInput value={customText} onChange={setCustomText} onSubmit={(v) => onSelectOption(v || customText)} />
+                </Box>
+            </Dialog>
+        );
+    }
+
     // ask_user_question with option list
     if (isQuestion && questionOptions.length > 0) {
         return (

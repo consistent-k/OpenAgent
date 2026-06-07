@@ -2,7 +2,7 @@
  * Telegram 消息监控主循环
  * 核心逻辑：long polling 接收消息 → 调用 AI → 发送回复
  */
-import { SessionManager } from '@oagent/channels';
+import { SessionManager, sleep } from '@oagent/channels';
 import type { AxiosInstance } from 'axios';
 import { processMessage } from '../messaging/process';
 import type { RunAgentFn } from '../types/plugin';
@@ -16,24 +16,6 @@ const MAX_CONSECUTIVE_FAILURES = 3;
 const BACKOFF_DELAY_MS = 30_000;
 const RETRY_DELAY_MS = 2_000;
 const LONG_POLL_TIMEOUT_S = 30;
-
-// ---------------------------------------------------------------------------
-// 辅助函数
-// ---------------------------------------------------------------------------
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const t = setTimeout(resolve, ms);
-        signal?.addEventListener(
-            'abort',
-            () => {
-                clearTimeout(t);
-                reject(new Error('aborted'));
-            },
-            { once: true }
-        );
-    });
-}
 
 // ---------------------------------------------------------------------------
 // 类型定义

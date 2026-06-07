@@ -247,6 +247,10 @@ export const en: Record<string, string> = {
     'tool.readFile.invalidRange': 'endLine must be >= startLine',
     'tool.readFile.notAFile': 'Path is not a file: {filePath}',
     'tool.readFile.fileTooLarge': 'File too large ({size}KB), exceeds {limit}KB limit',
+    'tool.readFile.startLineExceeds': 'startLine {startLine} exceeds total lines {totalLines}',
+
+    'tool.writeFile.fileAlreadyExists': 'File already exists: {filePath}',
+    'tool.writeFile.notAFile': 'Path exists but is not a file: {filePath}',
 
     'tool.glob.absolutePath': 'glob pattern must be a relative path',
     'tool.glob.parentRef': 'glob pattern cannot contain ".."',

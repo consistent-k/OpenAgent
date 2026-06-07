@@ -37,7 +37,7 @@ export async function* walkDirectory(
         if (SKIP_DIRS.has(entry.name)) continue;
 
         const fullPath = path.join(dir, entry.name);
-        const relativePath = path.relative(baseDir, fullPath);
+        const relativePath = path.relative(baseDir, fullPath).split(path.sep).join('/');
 
         yield { relativePath, fullPath, entry };
 

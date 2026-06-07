@@ -153,12 +153,15 @@ export async function listSessions(cwd: string): Promise<SessionSummary[]> {
 
         // firstUserMessage 取第一条非命令消息
         const firstUserEntry = group.find((e) => e.display.trim() && !e.display.trim().startsWith('/'));
-        const latestTimestamp = Math.max(...group.map((e) => e.timestamp));
+        let latestTimestamp = 0;
+        for (const e of group) {
+            if (e.timestamp > latestTimestamp) latestTimestamp = e.timestamp;
+        }
 
         result.push({
             sessionId,
             savedAt: new Date(latestTimestamp).toISOString(),
-            project: path.resolve(cwd),
+            project: group[0]?.project ?? path.resolve(cwd),
             firstUserMessage: firstUserEntry?.display.trim().slice(0, 80)
         });
     }

@@ -12,7 +12,8 @@
         "forceConsistentCasingInFileNames": true,
         "ignoreDeprecations": "6.0",
         "resolveJsonModule": true,
-        "isolatedModules": true
+        "isolatedModules": true,
+        "types": ["node"]
     },
     "include": ["src"]
 }

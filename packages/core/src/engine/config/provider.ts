@@ -33,6 +33,23 @@ function getOrCreateProvider(): ReturnType<typeof createOpenAICompatible> {
 }
 
 /**
+ * 按供应商配置获取或创建 provider（供子 Agent 使用，复用缓存）。
+ */
+export function getOrCreateProviderByConfig(config: { name: string; baseUrl: string; apiKey: string }): ReturnType<typeof createOpenAICompatible> {
+    const key = getCacheKey(config.baseUrl, config.apiKey);
+    let provider = providerCache.get(key);
+    if (!provider) {
+        provider = createOpenAICompatible({
+            name: config.name,
+            apiKey: config.apiKey,
+            baseURL: config.baseUrl
+        });
+        providerCache.set(key, provider);
+    }
+    return provider;
+}
+
+/**
  * 获取 AI provider。
  * 当传入 maxRetries 时，会在模型外层包裹重试通知中间件。
  */

@@ -62,12 +62,13 @@ export function getSupportedLocales(): Array<{ code: string; label: string; sour
  * @param key 翻译键名
  * @param vars 模板变量，如 { count: 5, name: 'weixin' }
  *
- * 回退链：当前语言 → zh → 原始 key
+ * 回退链：当前语言 → en → zh → 原始 key
  */
 export function t(key: string, vars?: Record<string, string | number>): string {
     const current = localeMap.get(currentLocale);
-    const fallback = localeMap.get('zh');
-    const template = current?.translations[key] ?? fallback?.translations[key] ?? key;
+    const en = localeMap.get('en');
+    const zh = localeMap.get('zh');
+    const template = current?.translations[key] ?? en?.translations[key] ?? zh?.translations[key] ?? key;
     if (!vars) return template;
     return Object.entries(vars).reduce((result, [k, v]) => result.replaceAll(`{${k}}`, String(v)), template);
 }

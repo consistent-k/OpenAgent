@@ -24,6 +24,49 @@ function escapeRegexChar(char: string): string {
     return /[\\^$+?.()|{}[\]]/.test(char) ? `\\${char}` : char;
 }
 
+function expandBraces(pattern: string): string[] {
+    const start = pattern.indexOf('{');
+    if (start === -1) return [pattern];
+
+    let depth = 0;
+    let end = -1;
+    for (let i = start; i < pattern.length; i++) {
+        if (pattern[i] === '{') depth++;
+        if (pattern[i] === '}') {
+            depth--;
+            if (depth === 0) {
+                end = i;
+                break;
+            }
+        }
+    }
+    if (end === -1) return [pattern];
+
+    const prefix = pattern.slice(0, start);
+    const suffix = pattern.slice(end + 1);
+    const inner = pattern.slice(start + 1, end);
+    const options: string[] = [];
+    let optionStart = 0;
+    let innerDepth = 0;
+    for (let i = 0; i < inner.length; i++) {
+        if (inner[i] === '{') innerDepth++;
+        if (inner[i] === '}') innerDepth--;
+        if (inner[i] === ',' && innerDepth === 0) {
+            options.push(inner.slice(optionStart, i));
+            optionStart = i + 1;
+        }
+    }
+    options.push(inner.slice(optionStart));
+
+    const results: string[] = [];
+    for (const opt of options) {
+        for (const expanded of expandBraces(prefix + opt + suffix)) {
+            results.push(expanded);
+        }
+    }
+    return results;
+}
+
 function globToRegex(glob: string): RegExp {
     const normalized = glob.replace(/\\/g, '/');
     let regexStr = '';
@@ -43,6 +86,15 @@ function globToRegex(glob: string): RegExp {
             regexStr += '[^/]*';
         } else if (char === '?') {
             regexStr += '[^/]';
+        } else if (char === '[') {
+            // 支持字符类 [abc]
+            const closeIdx = normalized.indexOf(']', i + 1);
+            if (closeIdx !== -1) {
+                regexStr += normalized.slice(i, closeIdx + 1);
+                i = closeIdx;
+            } else {
+                regexStr += escapeRegexChar(char);
+            }
         } else {
             regexStr += escapeRegexChar(char);
         }
@@ -65,13 +117,14 @@ export const globTool = tool({
     execute: async ({ pattern, path: searchDir }) => {
         assertSafePattern(pattern);
         const rootDir = searchDir ? resolveReadPath(searchDir) : ROOT_DIR;
-        const regex = globToRegex(pattern);
+        const expandedPatterns = expandBraces(pattern);
+        const regexes = expandedPatterns.map((p) => globToRegex(p));
         const results: string[] = [];
 
         for await (const { relativePath, entry } of walkDirectory(rootDir, rootDir)) {
             if (!entry.isFile()) continue;
             const posixPath = toPosixPath(relativePath);
-            if (regex.test(posixPath)) {
+            if (regexes.some((regex) => regex.test(posixPath))) {
                 results.push(posixPath);
                 if (results.length >= MAX_MATCHES) break;
             }

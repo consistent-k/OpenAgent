@@ -33,6 +33,8 @@ export function loadAccount(): TelegramAccount | null {
 export function saveAccount(account: TelegramAccount): void {
     ensureDir();
     fs.writeFileSync(ACCOUNT_FILE, JSON.stringify(account, null, 2), 'utf-8');
+    // 限制文件权限为仅所有者可读写（保护 bot token）
+    fs.chmodSync(ACCOUNT_FILE, 0o600);
 }
 
 /** 清除账号 */

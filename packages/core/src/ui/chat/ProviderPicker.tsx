@@ -34,12 +34,14 @@ interface FormStep {
     placeholder: string;
 }
 
-const FORM_STEPS: FormStep[] = [
-    { key: 'name', label: t('ui.providerForm.name'), placeholder: t('ui.providerForm.namePlaceholder') },
-    { key: 'baseUrl', label: t('ui.providerForm.baseUrl'), placeholder: t('ui.providerForm.baseUrlPlaceholder') },
-    { key: 'apiKey', label: t('ui.providerForm.apiKey'), placeholder: t('ui.providerForm.apiKeyPlaceholder') },
-    { key: 'models', label: t('ui.providerForm.models'), placeholder: t('ui.providerForm.modelsPlaceholder') }
-];
+function getFormSteps(): FormStep[] {
+    return [
+        { key: 'name', label: t('ui.providerForm.name'), placeholder: t('ui.providerForm.namePlaceholder') },
+        { key: 'baseUrl', label: t('ui.providerForm.baseUrl'), placeholder: t('ui.providerForm.baseUrlPlaceholder') },
+        { key: 'apiKey', label: t('ui.providerForm.apiKey'), placeholder: t('ui.providerForm.apiKeyPlaceholder') },
+        { key: 'models', label: t('ui.providerForm.models'), placeholder: t('ui.providerForm.modelsPlaceholder') }
+    ];
+}
 
 // ── Main component ──
 
@@ -211,9 +213,10 @@ export function ProviderPicker({ providers, activeProviderName, onAdd, onUpdate,
 
     const handleFormSubmit = useCallback(
         (value: string) => {
+            const formSteps = getFormSteps();
             if (formMode === 'add') {
-                if (formStep < FORM_STEPS.length - 1) {
-                    const newValues = { ...formValues, [FORM_STEPS[formStep]!.key]: value };
+                if (formStep < formSteps.length - 1) {
+                    const newValues = { ...formValues, [formSteps[formStep]!.key]: value };
                     setFormValues(newValues);
                     setFormStep(formStep + 1);
                 } else {
@@ -233,7 +236,7 @@ export function ProviderPicker({ providers, activeProviderName, onAdd, onUpdate,
                 }
             } else {
                 // Edit mode — single field update
-                const stepKey = FORM_STEPS[formStep]!.key;
+                const stepKey = formSteps[formStep]!.key;
                 if (selectedProvider) {
                     if (stepKey === 'name') {
                         onUpdate(selectedProvider.name, { newName: value });
@@ -358,7 +361,7 @@ export function ProviderPicker({ providers, activeProviderName, onAdd, onUpdate,
                             apiKey: selectedProvider.apiKey,
                             models: selectedProvider.models.join(', ')
                         });
-                        const stepIdx = FORM_STEPS.findIndex((s) => s.key === item.key);
+                        const stepIdx = getFormSteps().findIndex((s) => s.key === item.key);
                         setFormStep(stepIdx >= 0 ? stepIdx : 0);
                         setView('form');
                     }
@@ -395,14 +398,15 @@ export function ProviderPicker({ providers, activeProviderName, onAdd, onUpdate,
     // ── Render: Form view ──
 
     if (view === 'form') {
-        const step = FORM_STEPS[formStep]!;
+        const formSteps = getFormSteps();
+        const step = formSteps[formStep]!;
         const title = formMode === 'add' ? t('ui.providerForm.title') : t('ui.providerForm.editTitle', { name: selectedProvider?.name ?? '' });
         const currentValue = formValues[step.key as keyof typeof formValues] || '';
 
         return (
             <Dialog
                 title={title}
-                subtitle={formMode === 'add' ? t('ui.providerForm.step', { current: formStep + 1, total: FORM_STEPS.length }) : undefined}
+                subtitle={formMode === 'add' ? t('ui.providerForm.step', { current: formStep + 1, total: formSteps.length }) : undefined}
                 isActive={false}
                 onConfirm={() => {
                     /* Enter is handled by TextInput onSubmit */
@@ -413,7 +417,7 @@ export function ProviderPicker({ providers, activeProviderName, onAdd, onUpdate,
                     <Box>
                         <Text color="green">{'> '}</Text>
                         <TextInput
-                            value={formStep === formStep ? (formMode === 'add' && formStep === FORM_STEPS.length - 1 ? formValues.models : currentValue) : currentValue}
+                            value={formMode === 'add' && formStep === formSteps.length - 1 ? formValues.models : currentValue}
                             placeholder={step.placeholder}
                             onChange={(v) => {
                                 const key = step.key as keyof typeof formValues;

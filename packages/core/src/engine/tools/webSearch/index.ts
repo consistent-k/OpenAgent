@@ -25,7 +25,11 @@ function parseDuckDuckGoHtml(html: string, maxResults: number): SearchResult[] {
         // DuckDuckGo links may be redirect URLs — try to extract the real URL
         const uddgMatch = url.match(/[?&]uddg=([^&]+)/);
         if (uddgMatch) {
-            url = decodeURIComponent(uddgMatch[1]);
+            try {
+                url = decodeURIComponent(uddgMatch[1]);
+            } catch {
+                // malformed URL, keep original
+            }
         }
 
         if (title && url) {
@@ -113,7 +117,8 @@ export const webSearchTool = tool({
 
             try {
                 result = await searchViaApi(query, maxResults);
-            } catch {
+            } catch (apiError) {
+                console.warn('[webSearch] API search failed, falling back to DuckDuckGo:', apiError);
                 result = await searchViaDuckDuckGo(query, maxResults);
             }
 

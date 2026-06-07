@@ -6,7 +6,7 @@ export interface HighlightToken {
 }
 
 const TOKEN_RE =
-    /(?<comment>\/\/.*|#(?![\w-])[\s\S]*$|\/\*[\s\S]*?\*\/)|(?<string>"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(?<number>\b\d+\.?\d*\b)|(?<keyword>\b(?:import|export|from|require|const|let|var|function|return|if|else|for|while|class|extends|new|this|async|await|try|catch|throw|switch|case|break|default|typeof|instanceof|void|delete|yield|of|in|def|elif|except|finally|with|as|pass|raise|lambda|print|True|False|None|true|false|null|undefined|nil)\b)|(?<type>\b[A-Z][a-zA-Z0-9]*\b)|(?<ident>([a-zA-Z_]\w*)\s*(?=\())|(?<punctuation>[{}()[\];,.])|(?<operator>[+\-*/%=<>!&|^~?:@]+)/g;
+    /(?<comment>\/\/.*|\/\*[\s\S]*?\*\/)|(?<string>"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(?<number>\b\d+\.?\d*\b)|(?<keyword>\b(?:import|export|from|require|const|let|var|function|return|if|else|for|while|class|extends|new|this|async|await|try|catch|throw|switch|case|break|default|typeof|instanceof|void|delete|yield|of|in|def|elif|except|finally|with|as|pass|raise|lambda|print|True|False|None|true|false|null|undefined|nil)\b)|(?<type>\b[A-Z][a-zA-Z0-9]*\b)|(?<ident>([a-zA-Z_]\w*)\s*(?=\())|(?<punctuation>[{}()[\];,.])|(?<operator>[+\-*/%=<>!&|^~?:@#]+)/g;
 
 export function highlightCode(code: string): HighlightToken[] {
     const tokens: HighlightToken[] = [];

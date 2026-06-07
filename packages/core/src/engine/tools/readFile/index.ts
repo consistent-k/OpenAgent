@@ -32,6 +32,10 @@ export const readFileTool = tool({
         const start = startLine ?? 1;
         const end = endLine ?? lines.length;
 
+        if (start > lines.length) {
+            throw new Error(t('tool.readFile.startLineExceeds', { startLine: String(start), totalLines: String(lines.length) }));
+        }
+
         return {
             path: filePath,
             content: lines.slice(start - 1, end).join('\n'),

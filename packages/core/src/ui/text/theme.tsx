@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
+import { getConfigTheme, saveConfig } from '../../config';
 
 export interface SyntaxColors {
     keyword: string;
@@ -125,9 +126,27 @@ const ThemeContext = createContext<ThemeContextValue>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-    const [themeName, setThemeName] = useState<ThemeName>('mayday');
+    const [themeName, setThemeNameState] = useState<ThemeName>(() => {
+        try {
+            const saved = getConfigTheme();
+            if (saved in themes) return saved as ThemeName;
+        } catch {
+            // config 尚未就绪，使用默认主题
+        }
+        return 'mayday';
+    });
+
+    const setThemeName = (name: ThemeName) => {
+        setThemeNameState(name);
+        try {
+            saveConfig({ theme: name });
+        } catch {
+            // 忽略保存失败
+        }
+    };
+
     const toggleTheme = () =>
-        setThemeName((t) => {
+        setThemeNameState((t) => {
             const idx = themeOrder.indexOf(t);
             return themeOrder[(idx + 1) % themeOrder.length]!;
         });

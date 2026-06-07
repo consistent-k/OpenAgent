@@ -6,19 +6,17 @@ import type { UsageInfo } from '../../hooks/useChatStream';
 import { getBranch } from '../../utils/sessions';
 import { useTheme } from '../text/theme';
 
-const CONTEXT_WINDOWS: Record<string, number> = {
-    'claude-sonnet-4-20250514': 200000,
-    'claude-sonnet-4': 200000,
-    'claude-3-5-sonnet-latest': 200000,
-    'claude-3-opus-latest': 200000,
-    'claude-3-haiku-latest': 200000,
-    'gpt-4o': 128000,
-    'gpt-4o-mini': 128000,
-    'gpt-4-turbo': 128000,
-    'gpt-3.5-turbo': 16385,
-    'deepseek-chat': 128000,
-    'deepseek-reasoner': 128000
-};
+// 按前缀匹配上下文窗口，新模型自动适配
+const CONTEXT_WINDOWS: [string, number][] = [
+    ['gemini-', 1000000],
+    ['claude-', 200000],
+    ['deepseek-', 128000],
+    ['gpt-4', 128000],
+    ['gpt-3', 16385],
+    ['o1', 200000],
+    ['o3', 200000],
+    ['o4', 200000]
+];
 
 const DEFAULT_CONTEXT_WINDOW = 200000;
 
@@ -42,7 +40,7 @@ export function StatusBar({ cwd, modelId, usage }: StatusBarProps) {
     }, []);
 
     const displayPath = cwd.replace(os.homedir(), '~');
-    const maxTokens = Object.entries(CONTEXT_WINDOWS).find(([key]) => modelId.startsWith(key))?.[1] ?? DEFAULT_CONTEXT_WINDOW;
+    const maxTokens = CONTEXT_WINDOWS.find(([prefix]) => modelId.startsWith(prefix))?.[1] ?? DEFAULT_CONTEXT_WINDOW;
 
     const total = usage?.totalTokens ?? 0;
     const pct = maxTokens > 0 ? (total / maxTokens) * 100 : 0;

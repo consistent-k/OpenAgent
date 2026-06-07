@@ -1,8 +1,7 @@
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { agentRegistry, type AgentDefinition, type AgentResult, type AgentEventEmitter } from '@oagent/agents';
 import { tool, streamText, stepCountIs, type ModelMessage } from 'ai';
 import { z } from 'zod';
-import { getProvider } from '../config/provider';
+import { getProvider, getOrCreateProviderByConfig } from '../config/provider';
 import { tools as allTools } from '../tools';
 import { getProvider as getProviderConfig, getMaxSteps, getModelName } from '@/config';
 import { uid } from '@/utils/uid';
@@ -55,10 +54,10 @@ export function resolveAgentModel(agentDef: AgentDefinition, maxRetries: number)
             const modelName = agentDef.model.slice(slashIndex + 1);
             const providerConfig = getProviderConfig(providerName);
             if (providerConfig) {
-                const provider = createOpenAICompatible({
+                const provider = getOrCreateProviderByConfig({
                     name: providerConfig.name,
                     apiKey: providerConfig.apiKey,
-                    baseURL: providerConfig.baseUrl
+                    baseUrl: providerConfig.baseUrl
                 });
                 return provider.languageModel(modelName);
             }
@@ -177,7 +176,7 @@ function formatActivityLog(steps: AgentStep[]): string {
 
     const lines: string[] = [];
     for (const step of steps) {
-        const inputPreview = step.input ? ` ${step.input}` : '';
+        const inputPreview = step.input ? step.input : '';
         lines.push(`→ ${step.toolName}(${inputPreview})`);
         if (step.output) {
             lines.push(`  ← ${step.output}`);

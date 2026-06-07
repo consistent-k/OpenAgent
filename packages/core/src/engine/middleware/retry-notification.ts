@@ -69,6 +69,7 @@ export function createRetryNotificationMiddleware(maxRetries: number): LanguageM
     return {
         specificationVersion: 'v3',
         async wrapStream({ doStream }) {
+            attemptCount = 0;
             try {
                 return await doStream();
             } catch (error) {

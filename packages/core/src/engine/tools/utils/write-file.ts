@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { t } from '@oagent/i18n';
 import { resolveSafePath } from '@/utils/safe-path';
 
 interface WriteFileResult {
@@ -22,13 +23,13 @@ export async function writeFileContent(filePath: string, content: string, overwr
         });
 
     if (existedBefore && !overwrite) {
-        throw new Error(`File already exists: ${filePath}`);
+        throw new Error(t('tool.writeFile.fileAlreadyExists', { filePath }));
     }
 
     if (existedBefore) {
         const stat = await fs.stat(resolved);
         if (!stat.isFile()) {
-            throw new Error(`Path exists but is not a file: ${filePath}`);
+            throw new Error(t('tool.writeFile.notAFile', { filePath }));
         }
     }
 

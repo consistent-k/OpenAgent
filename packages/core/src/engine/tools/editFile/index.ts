@@ -28,7 +28,12 @@ export const editFileTool = tool({
         const resolved = resolveSafePath(filePath);
         const content = await fs.readFile(resolved, 'utf-8');
 
-        const count = content.split(old_string).length - 1;
+        let count = 0;
+        let idx = content.indexOf(old_string);
+        while (idx !== -1) {
+            count++;
+            idx = content.indexOf(old_string, idx + old_string.length);
+        }
         if (count === 0) {
             throw new Error(t('tool.editFile.notFound', { filePath }));
         }

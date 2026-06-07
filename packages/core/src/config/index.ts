@@ -59,6 +59,8 @@ export interface OpenAgentConfig {
     /** 当前激活的模型，格式 "供应商名/模型名"，如 "OpenAI/gpt-4o" */
     activeModel?: string;
     maxSteps?: number;
+    /** 当前主题，如 'dark'、'light'、'mayday' */
+    theme?: string;
     /** 启用的 channel 插件包名列表，如 ["@oagent/weixin"] */
     channels?: string[];
     /** 语言配置 */
@@ -85,7 +87,7 @@ export interface OpenAgentConfig {
 const DEFAULT_CONFIG: OpenAgentConfig = {
     providers: [],
     activeModel: '',
-    maxSteps: 5
+    maxSteps: DEFAULT_MAX_STEPS
 };
 
 let cachedConfig: OpenAgentConfig | null = null;
@@ -324,6 +326,11 @@ export function getConfigLocale(): string {
     return readConfig().locale?.lang ?? 'zh';
 }
 
+/** 获取配置的主题设置，默认 'mayday' */
+export function getConfigTheme(): string {
+    return readConfig().theme ?? 'mayday';
+}
+
 /** 获取用户自定义 Agent 配置列表 */
 export function getConfiguredAgents(): UserAgentConfig[] {
     return readConfig().agents ?? [];
@@ -347,7 +354,7 @@ export function addProvider(provider: ProviderConfig): void {
     if (existing.some((p) => p.name === provider.name)) {
         throw new Error(t('error.config.providerAlreadyExists', { name: provider.name }));
     }
-    saveConfig({ providers: [...existing, provider] } as Partial<OpenAgentConfig> & { locale?: string });
+    saveConfig({ providers: [...existing, provider] });
 }
 
 /** 删除供应商 */
@@ -358,7 +365,7 @@ export function deleteProvider(providerName: string): void {
     if (filtered.length === existing.length) {
         throw new Error(t('error.config.providerNotFound', { name: providerName }));
     }
-    const updates: Partial<OpenAgentConfig> & { locale?: string } = { providers: filtered };
+    const updates: Partial<OpenAgentConfig> = { providers: filtered };
     // 如果删除的是当前 active 的供应商，清空 activeModel
     const activeProvider = config.activeModel?.split('/')[0];
     if (activeProvider === providerName) {
@@ -389,12 +396,12 @@ export function updateProvider(providerName: string, updates: Partial<Omit<Provi
             saveConfig({
                 providers: existing.map((p, i) => (i === idx ? updated : p)),
                 activeModel: activeModel.replace(`${providerName}/`, `${newName}/`)
-            } as Partial<OpenAgentConfig> & { locale?: string });
+            });
             return;
         }
     }
     const newProviders = existing.map((p, i) => (i === idx ? updated : p));
-    saveConfig({ providers: newProviders } as Partial<OpenAgentConfig> & { locale?: string });
+    saveConfig({ providers: newProviders });
 }
 
 /** 添加模型到供应商 */
@@ -409,7 +416,7 @@ export function addModel(providerName: string, modelName: string): void {
         throw new Error(t('error.config.modelAlreadyExists', { model: modelName, provider: providerName }));
     }
     const newProviders = existing.map((p) => (p.name === providerName ? { ...p, models: [...p.models, modelName] } : p));
-    saveConfig({ providers: newProviders } as Partial<OpenAgentConfig> & { locale?: string });
+    saveConfig({ providers: newProviders });
 }
 
 /** 从供应商删除模型 */
@@ -424,7 +431,7 @@ export function deleteModel(providerName: string, modelName: string): void {
         throw new Error(t('error.config.modelNotFound', { model: modelName, provider: providerName }));
     }
     const newProviders = existing.map((p) => (p.name === providerName ? { ...p, models: p.models.filter((m) => m !== modelName) } : p));
-    const updates: Partial<OpenAgentConfig> & { locale?: string } = { providers: newProviders };
+    const updates: Partial<OpenAgentConfig> = { providers: newProviders };
     // 如果删除的是当前 active 的模型，清空 activeModel
     if (config.activeModel === `${providerName}/${modelName}`) {
         updates.activeModel = '';
@@ -440,29 +447,36 @@ export function getConfigSummary(): {
     apiKey: string;
     locale: string;
 } {
-    const apiKey = getApiKey();
+    const config = readConfig();
+    const resolved = resolveActiveProvider(config);
+    const apiKey = resolved?.provider.apiKey?.trim() ?? '';
     const maskedApiKey = apiKey ? (apiKey.length <= 8 ? '****' : `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}`) : '';
+    const maxStepsValue = config.maxSteps;
+    const maxSteps = maxStepsValue !== undefined && Number.isInteger(maxStepsValue) && maxStepsValue >= 1 && maxStepsValue <= 20 ? maxStepsValue : DEFAULT_MAX_STEPS;
     return {
-        provider: getActiveProviderName(),
-        baseUrl: getBaseUrl(),
-        model: getModelName(),
-        maxSteps: getMaxSteps(),
+        provider: resolved?.provider.name ?? '',
+        baseUrl: resolved?.provider.baseUrl?.trim() ?? '',
+        model: resolved?.modelName ?? '',
+        maxSteps,
         apiKey: maskedApiKey,
-        locale: getConfigLocale()
+        locale: config.locale?.lang ?? 'zh'
     };
 }
 
-export function saveConfig(updates: Partial<OpenAgentConfig> & { locale?: string }): void {
+export function saveConfig(updates: Partial<OpenAgentConfig>): void {
     const current = readConfig();
-    // 兼容：当 locale 为字符串时，写入 locale.lang
-    const { locale, ...rest } = updates;
-    const merged: OpenAgentConfig = { ...current, ...rest };
-    if (typeof locale === 'string') {
-        merged.locale = { ...current.locale, lang: locale };
-        setLocale(locale);
-    }
+    const merged: OpenAgentConfig = { ...current, ...updates };
     writeJsonFile(CONFIG_PATH, merged);
     cachedConfig = merged;
+}
+
+/** 保存 locale 配置（兼容旧的字符串格式） */
+export function saveLocale(locale: string): void {
+    const current = readConfig();
+    const merged: OpenAgentConfig = { ...current, locale: { ...current.locale, lang: locale } };
+    writeJsonFile(CONFIG_PATH, merged);
+    cachedConfig = merged;
+    setLocale(locale);
 }
 
 export function reloadConfig(): OpenAgentConfig {

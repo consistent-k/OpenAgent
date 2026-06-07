@@ -31,7 +31,7 @@ interface FileMatchResult {
     matchCount: number;
 }
 
-async function searchFileLines(filePath: string, regex: RegExp, context: number, lines: string[]): Promise<LineMatch[]> {
+function searchFileLines(filePath: string, regex: RegExp, context: number, lines: string[]): LineMatch[] {
     const matchingIndices: number[] = [];
     lines.forEach((line, i) => {
         if (regex.test(line)) matchingIndices.push(i);
@@ -106,10 +106,11 @@ export const grepTool = tool({
             const lines = await loadLines(filePath);
             if (!lines) return null;
 
-            const matches = await searchFileLines(filePath, regex, context, lines);
+            const matches = searchFileLines(filePath, regex, context, lines);
             if (matches.length === 0) return null;
 
-            return { file: relPath, matches, matchCount: matches.filter((m) => regex.test(m.content)).length || matches.length };
+            const matchCount = context > 0 ? lines.filter((l) => regex.test(l)).length : matches.length;
+            return { file: relPath, matches, matchCount };
         }
 
         async function searchDirectory(dir: string): Promise<FileMatchResult[]> {
@@ -143,7 +144,7 @@ export const grepTool = tool({
             const lines = await loadLines(resolved);
             if (!lines) throw new Error(t('tool.grep.cannotReadFile', { path: searchPath }));
 
-            const matches = await searchFileLines(resolved, regex, context, lines);
+            const matches = searchFileLines(resolved, regex, context, lines);
 
             if (output_mode === 'files_with_matches') {
                 return { path: searchPath, pattern, files: matches.length > 0 ? [searchPath] : [], totalFiles: matches.length > 0 ? 1 : 0 };

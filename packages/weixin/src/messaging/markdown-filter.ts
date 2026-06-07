@@ -351,6 +351,6 @@ export class StreamingMarkdownFilter {
     }
 
     private static containsCJK(text: string): boolean {
-        return /[⺀-鿿가-힯豈-﫿]/.test(text);
+        return /[⺀-鿿぀-ヿ가-힯豈-﫿]/.test(text);
     }
 }

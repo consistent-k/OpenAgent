@@ -1,6 +1,6 @@
 import { t } from '@oagent/i18n';
 import { Box, Text, useInput } from 'ink';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Dialog } from '@/ui/text/Dialog';
 import { ListItem } from '@/ui/text/ListItem';
 import { formatSessionTime, type SessionSummary } from '@/utils/sessions';
@@ -46,6 +46,7 @@ function Scrollbar({ total, offset, visible }: { total: number; offset: number; 
 
 export function SessionPicker({ sessions, onSelect, onCancel, onDelete }: Props) {
     const [selectedIdx, setSelectedIdx] = useState(0);
+    const selectedIdxRef = useRef(0);
     const [scrollOffset, setScrollOffset] = useState(0);
     const VISIBLE_COUNT = 10;
 
@@ -55,6 +56,9 @@ export function SessionPicker({ sessions, onSelect, onCancel, onDelete }: Props)
     const maxOffset = Math.max(0, sorted.length - VISIBLE_COUNT);
     const clampedOffset = Math.min(scrollOffset, maxOffset);
     const visibleSessions = sorted.slice(clampedOffset, clampedOffset + VISIBLE_COUNT);
+
+    // 同步 ref
+    selectedIdxRef.current = selectedIdx;
 
     useInput(
         useCallback(
@@ -72,18 +76,18 @@ export function SessionPicker({ sessions, onSelect, onCancel, onDelete }: Props)
                 } else if (key.pageDown) {
                     setSelectedIdx((prev) => Math.min(sorted.length - 1, prev + VISIBLE_COUNT));
                 } else if (key.return) {
-                    const session = sorted[selectedIdx];
+                    const session = sorted[selectedIdxRef.current];
                     if (session) {
                         onSelect(session.sessionId);
                     }
                 } else if ((key.delete || key.backspace) && onDelete) {
-                    const session = sorted[selectedIdx];
+                    const session = sorted[selectedIdxRef.current];
                     if (session) {
                         onDelete(session.sessionId);
                     }
                 }
             },
-            [sorted, selectedIdx, onSelect, onDelete]
+            [sorted, onSelect, onDelete]
         )
     );
 

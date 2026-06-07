@@ -5,6 +5,7 @@ import { findCommand, COMMANDS, parseCommandInput } from './commands';
 import {
     getConfigSummary,
     saveConfig,
+    saveLocale,
     reloadConfig,
     isConfigReady,
     setActiveModel,
@@ -140,9 +141,13 @@ function AppContent() {
                     const modelName = value.slice(slashIndex + 1);
                     setActiveModel(providerName, modelName);
                 } else if (key === 'maxSteps') {
-                    saveConfig({ maxSteps: Number(value) });
+                    const num = Number(value);
+                    if (!Number.isInteger(num) || num < 1 || num > 20) {
+                        throw new Error(t('error.config.invalidMaxSteps'));
+                    }
+                    saveConfig({ maxSteps: num });
                 } else if (key === 'locale') {
-                    saveConfig({ locale: value });
+                    saveLocale(value);
                 }
                 reloadConfig();
                 setOverlay(null);
@@ -158,7 +163,7 @@ function AppContent() {
                 ]);
             }
         },
-        [getConfigItems, appendMessages]
+        [appendMessages]
     );
 
     const handleManageProviders = useCallback(() => {
@@ -433,7 +438,7 @@ function AppContent() {
             // 记录普通消息到 history.jsonl
             appendHistory(trimmed, cwd, sessionIdRef.current).catch(() => {});
             setInputValue('');
-            await send(text);
+            await send(trimmed);
         },
         [
             appendMessages,
@@ -446,12 +451,12 @@ function AppContent() {
             displayMessages,
             pendingApproval,
             setSession,
-            cancel,
             saveCurrentSession,
             newSessionId,
             themeName,
             setThemeName,
             getConfigItems,
+            refreshProviderList,
             setOverlay
         ]
     );

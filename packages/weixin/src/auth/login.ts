@@ -86,15 +86,24 @@ async function fetchQRCode(apiBaseUrl: string, botType: string): Promise<QRCodeR
     return JSON.parse(rawText) as QRCodeResponse;
 }
 
-/** 从 stdin 读取验证码 */
+/** 从 stdin 读取验证码（5 分钟超时） */
 async function readVerifyCodeFromStdin(prompt: string): Promise<string> {
     process.stdout.write(prompt);
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         let input = '';
+        const timeout = setTimeout(
+            () => {
+                process.stdin.removeListener('data', onData);
+                process.stdin.pause();
+                reject(new Error('读取验证码超时'));
+            },
+            5 * 60 * 1000
+        );
         const onData = (chunk: Buffer | string) => {
             const str = chunk.toString();
             input += str;
             if (input.includes('\n')) {
+                clearTimeout(timeout);
                 process.stdin.removeListener('data', onData);
                 process.stdin.pause();
                 resolve(input.trim());

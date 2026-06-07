@@ -29,8 +29,8 @@ function loadProjectAgents(): void {
         const content = fs.readFileSync(agentsPath, 'utf-8');
         const agents = parseAgentsMarkdown(content);
         agentRegistry.registerAll(agents);
-    } catch {
-        // Silently ignore — same behavior as existing AGENTS.md reading
+    } catch (err) {
+        console.warn('[agents] Failed to load project AGENTS.md:', err);
     }
 }
 
@@ -53,8 +53,8 @@ function loadUserConfigAgents(agents?: UserAgentConfig[]): void {
             };
             agentRegistry.register(agent);
         }
-    } catch {
-        // Silently ignore config read errors
+    } catch (err) {
+        console.warn('[agents] Failed to load user-config agents:', err);
     }
 }
 
@@ -62,27 +62,33 @@ function loadUserConfigAgents(agents?: UserAgentConfig[]): void {
  * Load agent plugins from config.json's agentPlugins field.
  * Each plugin package must export a `register(registry)` function.
  */
+/** 校验是否为合法 npm 包名（防止路径穿越） */
+function isValidPackageName(name: string): boolean {
+    // npm 包名规则：允许 @scope/name 或 name，不能包含 .. / \ 等
+    return /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name) && !name.includes('..');
+}
+
 async function loadAgentPlugins(pluginPkgs?: string[]): Promise<void> {
     if (!pluginPkgs || pluginPkgs.length === 0) return;
-    try {
-        for (const pkgName of pluginPkgs) {
-            try {
-                let mod;
-                try {
-                    mod = await import(pkgName);
-                } catch {
-                    // Global not found, try local node_modules
-                    const localPath = path.resolve(process.cwd(), 'node_modules', pkgName, 'dist', 'index.js');
-                    mod = await import(localPath);
-                }
-                if (typeof mod.register === 'function') {
-                    mod.register(agentRegistry);
-                }
-            } catch {
-                // Silently ignore plugin load errors
-            }
+    for (const pkgName of pluginPkgs) {
+        if (!isValidPackageName(pkgName)) {
+            console.warn(`[agents] Skipping invalid plugin package name: "${pkgName}"`);
+            continue;
         }
-    } catch {
-        // Silently ignore
+        try {
+            let mod;
+            try {
+                mod = await import(pkgName);
+            } catch {
+                // Global not found, try local node_modules
+                const localPath = path.resolve(process.cwd(), 'node_modules', pkgName, 'dist', 'index.js');
+                mod = await import(localPath);
+            }
+            if (typeof mod.register === 'function') {
+                mod.register(agentRegistry);
+            }
+        } catch (err) {
+            console.warn(`[agents] Failed to load plugin "${pkgName}":`, err);
+        }
     }
 }

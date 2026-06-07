@@ -71,10 +71,26 @@ const READONLY_COMMANDS = new Set([
     'history'
 ]);
 
-function isReadonlyCommand(command: string): boolean {
-    const trimmed = command.trim();
+function isSingleReadonlyCommand(cmd: string): boolean {
+    const trimmed = cmd.trim();
     if (DANGEROUS_PATTERNS.some(({ pattern }) => pattern.test(trimmed))) {
         return false;
+    }
+    const hasSubst = /\$\s*\(|`[^`]*`/.test(trimmed);
+    if (hasSubst) {
+        return false;
+    }
+    const baseCommand = trimmed.split(/\s+/)[0]?.split('/').pop() ?? '';
+    return READONLY_COMMANDS.has(baseCommand);
+}
+
+function isReadonlyCommand(command: string): boolean {
+    const trimmed = command.trim();
+
+    // 用 && 连接的命令，检查每一段是否都是只读
+    const andParts = trimmed.split(/\s*&&\s*/);
+    if (andParts.length > 1) {
+        return andParts.every((part) => isSingleReadonlyCommand(part));
     }
 
     const hasShellOperators = /[<>|&]|\|\||;/.test(trimmed);
@@ -82,13 +98,7 @@ function isReadonlyCommand(command: string): boolean {
         return false;
     }
 
-    const hasSubst = /\$\s*\(|`[^`]*`/.test(trimmed);
-    if (hasSubst) {
-        return false;
-    }
-
-    const baseCommand = trimmed.split(/\s+/)[0]?.split('/').pop() ?? '';
-    return READONLY_COMMANDS.has(baseCommand);
+    return isSingleReadonlyCommand(trimmed);
 }
 
 function assertSafe(command: string): void {
@@ -107,8 +117,13 @@ function tail(text: string, maxBytes: number): { text: string; cut: boolean } {
 
     const buf = Buffer.from(text, 'utf-8');
     let start = buf.length - maxBytes;
+    // 跳过 UTF-8 续字节，确保不截断多字节字符
     while (start < buf.length && (buf[start]! & 0xc0) === 0x80) {
         start++;
+    }
+    // 如果整个剩余缓冲区都是续字节（损坏的 UTF-8），回退到安全位置
+    if (start >= buf.length) {
+        start = Math.max(0, buf.length - maxBytes);
     }
 
     return {

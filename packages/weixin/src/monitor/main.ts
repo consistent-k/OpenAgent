@@ -2,7 +2,7 @@
  * 微信消息监控主循环
  * 核心逻辑：长轮询接收消息 → 适配 → 调用 AI → 发送回复
  */
-import { SessionManager } from '@oagent/channels';
+import { SessionManager, sleep } from '@oagent/channels';
 import { getUpdates, notifyStart, notifyStop, DEFAULT_LONG_POLL_TIMEOUT_MS } from '../api/endpoints';
 import { adaptWeixinMessage } from '../messaging/adapter';
 import { processMessage } from '../messaging/process';
@@ -24,20 +24,6 @@ const SESSION_PAUSE_MS = 5 * 60_000;
 // ---------------------------------------------------------------------------
 // 辅助函数
 // ---------------------------------------------------------------------------
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const t = setTimeout(resolve, ms);
-        signal?.addEventListener(
-            'abort',
-            () => {
-                clearTimeout(t);
-                reject(new Error('aborted'));
-            },
-            { once: true }
-        );
-    });
-}
 
 /** 检查是否为会话过期错误 */
 function isSessionExpired(resp: { ret?: number; errcode?: number }): boolean {

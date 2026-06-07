@@ -1,1 +1,2 @@
-export { processMessage, getToolLabel } from './process';
+export { processMessage } from './process';
+export { getToolLabel } from '@oagent/channels';

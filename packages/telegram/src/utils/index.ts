@@ -1,2 +1,2 @@
-export { logger, setLogLevel } from './logger';
+export { logger } from './logger';
 export { truncate, redactToken, redactUrl } from './redact';

@@ -102,12 +102,16 @@ function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableSt
     const pending = new Map<string, { toolName: string; input: unknown; dynamic?: boolean }>();
     let streamError: string | undefined;
     const origError = console.error;
+    let errorSuppressed = false;
 
     return stream.pipeThrough(
         new TransformStream<UIMessageChunk, UIMessageChunk>({
             transform(chunk, controller) {
                 // 抑制 AI SDK 内部的 console.error
-                console.error = () => {};
+                if (!errorSuppressed) {
+                    console.error = () => {};
+                    errorSuppressed = true;
+                }
 
                 if (chunk.type === 'tool-input-start') {
                     pending.set(chunk.toolCallId, { toolName: chunk.toolName, input: '', dynamic: chunk.dynamic });
@@ -145,7 +149,18 @@ function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableSt
                         dynamic: info.dynamic
                     } as UIMessageChunk);
                 }
-                console.error = origError;
+                // 确保始终恢复 console.error
+                if (errorSuppressed) {
+                    console.error = origError;
+                    errorSuppressed = false;
+                }
+            },
+            cancel() {
+                // 流被取消时也要恢复 console.error
+                if (errorSuppressed) {
+                    console.error = origError;
+                    errorSuppressed = false;
+                }
             }
         })
     );
@@ -153,6 +168,7 @@ function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableSt
 
 export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChatStreamResult {
     const usageRef = useRef<UsageInfo | null>(null);
+    const [usage, setUsage] = useState<UsageInfo | null>(null);
     const providerName = getActiveProviderName();
     const modelName = getModelName();
     const modelId = providerName && modelName ? `${providerName}/${modelName}` : modelName;
@@ -172,11 +188,13 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
                 result.totalUsage.then(
                     (totalUsage) => {
                         if (totalUsage) {
-                            usageRef.current = {
+                            const info: UsageInfo = {
                                 inputTokens: totalUsage.inputTokens ?? 0,
                                 outputTokens: totalUsage.outputTokens ?? 0,
                                 totalTokens: totalUsage.totalTokens ?? 0
                             };
+                            usageRef.current = info;
+                            setUsage(info);
                         }
                     },
                     () => {
@@ -237,8 +255,6 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
 
     // unmount 时清除全局回调
     useEffect(() => () => clearRetryCallback(), []);
-
-    const usage = usageRef.current;
 
     // --- 方法 ---
 

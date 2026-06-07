@@ -47,8 +47,8 @@ export class SessionManager {
     }
 
     private trimHistory(history: ModelMessage[]): void {
-        while (history.length > MAX_HISTORY_MESSAGES) {
-            history.shift();
+        if (history.length > MAX_HISTORY_MESSAGES) {
+            history.splice(0, history.length - MAX_HISTORY_MESSAGES);
         }
     }
 }

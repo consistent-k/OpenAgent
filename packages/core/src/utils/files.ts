@@ -122,7 +122,10 @@ export async function expandMentions(text: string, index: FileEntry[], cwd: stri
             const entry = byPath.get(mt.token);
             if (!entry || entry.type !== 'file') return null;
             try {
-                const content = await fs.readFile(path.join(cwd, mt.token), 'utf-8');
+                const resolved = path.resolve(cwd, mt.token);
+                // 防止路径穿越：解析后的路径必须在 cwd 内
+                if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) return null;
+                const content = await fs.readFile(resolved, 'utf-8');
                 return `${mt.lead}<file path="${mt.token}">\n${content}\n</file>`;
             } catch {
                 return null;
