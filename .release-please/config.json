@@ -10,7 +10,7 @@
     "changelog-header": "# Changelog\n\n本文档记录 OpenAgent 的所有重要变更。",
     "packages": {
         ".": {
-            "component": "oa",
+            "tag-prefix": "v",
             "extra-files": [
                 "packages/core/package.json",
                 "packages/agents/package.json",
