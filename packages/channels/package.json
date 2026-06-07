@@ -1,6 +1,6 @@
 {
     "name": "@oagent/channels",
-    "version": "1.0.5",
+    "version": "1.1.0",
     "description": "Channel abstraction layer for OpenAgent",
     "type": "module",
     "main": "./dist/index.js",
