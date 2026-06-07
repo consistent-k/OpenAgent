@@ -1,9 +1,9 @@
 {
-    ".": "1.0.5",
-    "packages/core": "1.0.5",
-    "packages/agents": "1.0.5",
-    "packages/channels": "1.0.5",
-    "packages/weixin": "1.0.5",
-    "packages/telegram": "1.0.5",
-    "packages/i18n": "1.0.5"
+    ".": "1.1.0",
+    "packages/core": "1.1.0",
+    "packages/agents": "1.1.0",
+    "packages/channels": "1.1.0",
+    "packages/weixin": "1.1.0",
+    "packages/telegram": "1.1.0",
+    "packages/i18n": "1.1.0"
 }
