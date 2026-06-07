@@ -76,18 +76,6 @@ export function ProviderPicker({ providers, activeProviderName, onAdd, onUpdate,
                     setFormStep(0);
                     setFormValues({ name: '', baseUrl: '', apiKey: '', models: '' });
                     setView('form');
-                } else if (key.return) {
-                    const item = listItems[listIndex];
-                    if (item?.type === 'add') {
-                        setFormMode('add');
-                        setFormStep(0);
-                        setFormValues({ name: '', baseUrl: '', apiKey: '', models: '' });
-                        setView('form');
-                    } else if (item?.type === 'provider') {
-                        setSelectedProvider(item.provider);
-                        setDetailIndex(0);
-                        setView('detail');
-                    }
                 } else if (key.backspace || key.delete) {
                     const item = listItems[listIndex];
                     if (item?.type === 'provider') {

@@ -32,12 +32,6 @@ export function ModelPicker({ providerName, models, onAdd, onDelete, onCancel }:
                 } else if (input === 'a') {
                     setAdding(true);
                     setAddValue('');
-                } else if (key.return) {
-                    const item = allItems[index];
-                    if (item?.type === 'add') {
-                        setAdding(true);
-                        setAddValue('');
-                    }
                 } else if (key.backspace || key.delete) {
                     const item = allItems[index];
                     if (item?.type === 'model') {
@@ -74,6 +68,7 @@ export function ModelPicker({ providerName, models, onAdd, onDelete, onCancel }:
         return (
             <Dialog
                 title={t('ui.modelPicker.inputModel')}
+                isActive={false}
                 onConfirm={() => {
                     if (addValue.trim()) {
                         onAdd(addValue.trim());

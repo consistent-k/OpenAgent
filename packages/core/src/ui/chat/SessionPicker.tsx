@@ -75,11 +75,6 @@ export function SessionPicker({ sessions, onSelect, onCancel, onDelete }: Props)
                     setSelectedIdx((prev) => Math.max(0, prev - VISIBLE_COUNT));
                 } else if (key.pageDown) {
                     setSelectedIdx((prev) => Math.min(sorted.length - 1, prev + VISIBLE_COUNT));
-                } else if (key.return) {
-                    const session = sorted[selectedIdxRef.current];
-                    if (session) {
-                        onSelect(session.sessionId);
-                    }
                 } else if ((key.delete || key.backspace) && onDelete) {
                     const session = sorted[selectedIdxRef.current];
                     if (session) {

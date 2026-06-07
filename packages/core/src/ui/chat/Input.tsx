@@ -77,17 +77,13 @@ export function Input({ value, onChange, onSubmit, disabled, fileIndex, mode, ch
         onFileSelect: handleFileSelect
     });
 
-    // ---- Command mode: arrow key selection + Enter submit ----
+    // ---- Command mode: arrow key selection (Enter handled by ThemedInput) ----
     useInput(
         (_input, key) => {
             if (key.upArrow) {
                 setCommandIndex((i) => Math.max(0, i - 1));
             } else if (key.downArrow) {
                 setCommandIndex((i) => Math.min(filteredCommands.length - 1, i + 1));
-            } else if (key.return) {
-                const highlighted = filteredCommands[commandIndex]?.name;
-                onSubmit(value, highlighted);
-                onChange('');
             }
         },
         { isActive: mode === 'command' }

@@ -43,6 +43,7 @@ export function ConfigPicker({ items, onSave, onCancel, onManageProviders }: Con
             <Dialog
                 title={t('ui.configPicker.editTitle', { label: editing.label })}
                 subtitle={t('ui.configPicker.currentValue', { value: editing.value })}
+                isActive={false}
                 onConfirm={() => {
                     if (editValue.trim()) {
                         onSave(editing.key, editValue.trim());
