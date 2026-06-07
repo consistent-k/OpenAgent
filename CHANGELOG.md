@@ -2,6 +2,13 @@
 
 本文档记录 OpenAgent 的所有重要变更。
 
+## [1.1.1](https://github.com/consistent-k/OpenAgent/compare/oa-v1.1.0...oa-v1.1.1) (2026-06-07)
+
+
+### 🐛 Bug 修复
+
+* 修复 useInput 与 Dialog 的 Enter 键冲突导致命令重复执行 ([c8b6387](https://github.com/consistent-k/OpenAgent/commit/c8b6387ba9425d2e30398a3c6aa9d466ab45407e))
+
 ## [1.1.0](https://github.com/consistent-k/OpenAgent/compare/oa-v1.0.5...oa-v1.1.0) (2026-06-07)
 
 
