@@ -19,12 +19,6 @@
                 "packages/telegram/package.json",
                 "packages/i18n/package.json"
             ]
-        },
-        "packages/core": { "component": "@oagent/core" },
-        "packages/agents": { "component": "@oagent/agents" },
-        "packages/channels": { "component": "@oagent/channels" },
-        "packages/weixin": { "component": "@oagent/weixin" },
-        "packages/telegram": { "component": "@oagent/telegram" },
-        "packages/i18n": { "component": "@oagent/i18n" }
+        }
     }
 }
