@@ -1,6 +1,6 @@
 {
     "name": "@oagent/weixin",
-    "version": "1.0.5",
+    "version": "1.1.0",
     "description": "WeChat channel plugin for OpenAgent",
     "type": "module",
     "main": "./dist/index.js",
