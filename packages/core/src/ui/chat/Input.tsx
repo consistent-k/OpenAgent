@@ -1,3 +1,4 @@
+import { t } from '@oagent/i18n';
 import { Box, useInput } from 'ink';
 import type { ReactNode } from 'react';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -104,7 +105,7 @@ export function Input({ value, onChange, onSubmit, disabled, fileIndex, mode, ch
             <Box flexDirection="column">
                 <ThemedBox borderColor="border" paddingX={1}>
                     <ThemedText color="textDim">{'> '}</ThemedText>
-                    <ThemedText color="textDim">{value || 'Waiting for response...'}</ThemedText>
+                    <ThemedText color="textDim">{value || t('ui.input.aiResponding')}</ThemedText>
                 </ThemedBox>
                 <Divider color="border" />
             </Box>

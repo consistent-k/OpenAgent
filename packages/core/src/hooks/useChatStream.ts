@@ -100,6 +100,7 @@ function shouldSendAutomatically({ messages }: { messages: UIMessage[] }) {
 /** 包装流：跟踪 tool-call 生命周期，流结束时自动补发缺失的 tool-output-error chunk，同时抑制 AI SDK 内部的 console.error */
 function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableStream<UIMessageChunk> {
     const pending = new Map<string, { toolName: string; input: unknown; dynamic?: boolean }>();
+    let streamError: string | undefined;
     const origError = console.error;
 
     return stream.pipeThrough(
@@ -118,18 +119,29 @@ function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableSt
                 if (chunk.type === 'tool-input-available') {
                     pending.set(chunk.toolCallId, { toolName: chunk.toolName, input: chunk.input, dynamic: chunk.dynamic });
                 }
-                if (chunk.type === 'tool-output-available' || chunk.type === 'tool-output-error' || chunk.type === 'tool-output-denied') {
+                if (
+                    chunk.type === 'tool-output-available' ||
+                    chunk.type === 'tool-output-error' ||
+                    chunk.type === 'tool-output-denied' ||
+                    chunk.type === 'tool-input-error' ||
+                    chunk.type === 'tool-approval-request'
+                ) {
                     pending.delete(chunk.toolCallId);
+                }
+                // 捕获流中的错误信息，用于补发给 stuck tool calls
+                if (chunk.type === 'error' && 'errorText' in chunk) {
+                    streamError = chunk.errorText as string;
                 }
 
                 controller.enqueue(chunk);
             },
             flush(controller) {
+                const baseMsg = streamError ? `${t('error.streamInterrupted')} — ${streamError}` : t('error.streamInterrupted');
                 for (const [toolCallId, info] of pending) {
                     controller.enqueue({
                         type: 'tool-output-error',
                         toolCallId,
-                        errorText: t('error.streamInterrupted'),
+                        errorText: baseMsg,
                         dynamic: info.dynamic
                     } as UIMessageChunk);
                 }
@@ -143,7 +155,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
     const usageRef = useRef<UsageInfo | null>(null);
     const providerName = getActiveProviderName();
     const modelName = getModelName();
-    const modelIdRef = useRef(providerName && modelName ? `${providerName}/${modelName}` : modelName);
+    const modelId = providerName && modelName ? `${providerName}/${modelName}` : modelName;
     const [tip, setTip] = useState<TipState>(null);
 
     // Transport is stable — reads agent lazily from ref each call
@@ -227,7 +239,6 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
     useEffect(() => () => clearRetryCallback(), []);
 
     const usage = usageRef.current;
-    const modelId = modelIdRef.current;
 
     // --- 方法 ---
 

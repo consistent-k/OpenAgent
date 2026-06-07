@@ -360,7 +360,11 @@ function AppContent() {
             setShowReasoning((v) => !v);
         } else if (key.ctrl && input === 'o') {
             setShowToolDetails((v) => !v);
-        } else if ((key.ctrl && input === 'c') || key.escape) {
+        } else if (key.ctrl && input === 'c') {
+            if (status === 'streaming' || status === 'awaiting_approval') {
+                cancel();
+            }
+        } else if (key.escape && overlay === null) {
             if (status === 'streaming' || status === 'awaiting_approval') {
                 cancel();
             }
