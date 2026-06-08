@@ -107,12 +107,15 @@ export const zh: Record<string, string> = {
     'ui.commandPalette.noMatch': '(无匹配命令)',
 
     'ui.configPicker.editTitle': '编辑 {label}',
-    'ui.configPicker.currentValue': '当前值：{value}',
+    'ui.configPicker.editSubtitle': 'Enter 确认，Esc 返回',
     'ui.configPicker.title': '配置管理',
-    'ui.configPicker.subtitle': '↑/↓ 选择，Enter 编辑',
+    'ui.configPicker.subtitle': '↑/↓ 导航，Enter 编辑，Esc 返回',
     'ui.configPicker.currentValueShort': '当前：{value}',
     'ui.configPicker.currentValueNotEditable': '当前：{value}（不可编辑）',
     'ui.configPicker.providers': '供应商管理',
+    'ui.configPicker.selectModel': '选择模型',
+    'ui.configPicker.selectModelSubtitle': '↑/↓ 导航，Enter 确认，Esc 返回',
+    'ui.configPicker.noModels': '暂无可用模型，请先配置供应商和模型',
 
     'ui.providerPicker.title': '供应商管理',
     'ui.providerPicker.subtitle': '↑/↓ 导航，Enter 详情，a 添加，Backspace 删除，Esc 返回',

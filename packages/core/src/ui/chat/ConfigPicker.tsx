@@ -4,6 +4,7 @@ import TextInput from 'ink-text-input';
 import React, { useMemo, useState } from 'react';
 import { Dialog } from '../text/Dialog';
 import { ListItem } from '../text/ListItem';
+import { getAllModelOptions } from '@/config';
 
 export interface ConfigItem {
     key: string;
@@ -23,12 +24,16 @@ export function ConfigPicker({ items, onSave, onCancel, onManageProviders }: Con
     const [index, setIndex] = useState(0);
     const [editing, setEditing] = useState<ConfigItem | null>(null);
     const [editValue, setEditValue] = useState('');
+    const [selectingModel, setSelectingModel] = useState(false);
+    const [modelIndex, setModelIndex] = useState(0);
+
+    const modelOptions = useMemo(() => getAllModelOptions(), []);
 
     const allItems = useMemo(() => [...items, { key: 'providers', label: t('ui.configPicker.providers'), value: '', editable: false }], [items]);
 
     useInput(
         (_input, key) => {
-            if (editing) return;
+            if (editing || selectingModel) return;
             if (key.upArrow) {
                 setIndex((i) => Math.max(0, i - 1));
             } else if (key.downArrow) {
@@ -38,11 +43,62 @@ export function ConfigPicker({ items, onSave, onCancel, onManageProviders }: Con
         { isActive: true }
     );
 
+    useInput(
+        (_input, key) => {
+            if (key.escape) {
+                setEditing(null);
+                setEditValue('');
+            }
+        },
+        { isActive: !!editing }
+    );
+
+    useInput(
+        (_input, key) => {
+            if (key.escape) {
+                setSelectingModel(false);
+            } else if (key.upArrow) {
+                setModelIndex((i) => Math.max(0, i - 1));
+            } else if (key.downArrow) {
+                setModelIndex((i) => Math.min(modelOptions.length - 1, i + 1));
+            }
+        },
+        { isActive: selectingModel }
+    );
+
+    if (selectingModel) {
+        return (
+            <Dialog
+                title={t('ui.configPicker.selectModel')}
+                subtitle={t('ui.configPicker.selectModelSubtitle')}
+                onConfirm={() => {
+                    if (modelOptions[modelIndex]) {
+                        onSave('activeModel', modelOptions[modelIndex]!);
+                    }
+                    setSelectingModel(false);
+                }}
+                onCancel={() => {
+                    setSelectingModel(false);
+                }}
+            >
+                {modelOptions.length === 0 ? (
+                    <Text color="yellow">{t('ui.configPicker.noModels')}</Text>
+                ) : (
+                    modelOptions.map((option, i) => (
+                        <ListItem key={option} isFocused={i === modelIndex}>
+                            {option}
+                        </ListItem>
+                    ))
+                )}
+            </Dialog>
+        );
+    }
+
     if (editing) {
         return (
             <Dialog
                 title={t('ui.configPicker.editTitle', { label: editing.label })}
-                subtitle={t('ui.configPicker.currentValue', { value: editing.value })}
+                subtitle={t('ui.configPicker.editSubtitle')}
                 isActive={false}
                 onConfirm={() => {
                     if (editValue.trim()) {
@@ -79,12 +135,17 @@ export function ConfigPicker({ items, onSave, onCancel, onManageProviders }: Con
             onConfirm={
                 focusedItem.key === 'providers'
                     ? onManageProviders
-                    : focusedItem.editable
+                    : focusedItem.key === 'activeModel'
                       ? () => {
-                            setEditing(focusedItem);
-                            setEditValue(focusedItem.value);
+                            setSelectingModel(true);
+                            setModelIndex(0);
                         }
-                      : undefined
+                      : focusedItem.editable
+                        ? () => {
+                              setEditing(focusedItem);
+                              setEditValue(focusedItem.value);
+                          }
+                        : undefined
             }
             onCancel={onCancel}
         >

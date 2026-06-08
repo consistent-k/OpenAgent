@@ -107,12 +107,15 @@ export const en: Record<string, string> = {
     'ui.commandPalette.noMatch': '(No matching commands)',
 
     'ui.configPicker.editTitle': 'Edit {label}',
-    'ui.configPicker.currentValue': 'Current value: {value}',
+    'ui.configPicker.editSubtitle': 'Enter to confirm, Esc back',
     'ui.configPicker.title': 'Configuration',
-    'ui.configPicker.subtitle': '↑/↓ to select, Enter to edit',
+    'ui.configPicker.subtitle': '↑/↓ navigate, Enter to edit, Esc back',
     'ui.configPicker.currentValueShort': 'Current: {value}',
     'ui.configPicker.currentValueNotEditable': 'Current: {value} (not editable)',
     'ui.configPicker.providers': 'Provider Management',
+    'ui.configPicker.selectModel': 'Select Model',
+    'ui.configPicker.selectModelSubtitle': '↑/↓ navigate, Enter confirm, Esc back',
+    'ui.configPicker.noModels': 'No models available, please configure providers and models first',
 
     'ui.providerPicker.title': 'Provider Management',
     'ui.providerPicker.subtitle': '↑/↓ navigate, Enter details, a add, Backspace delete, Esc back',
