@@ -2,7 +2,9 @@ import { t } from '@oagent/i18n';
 import type { DynamicToolUIPart, ToolUIPart } from 'ai';
 import { getToolName } from 'ai';
 import { Box } from 'ink';
-import React from 'react';
+import React, { useEffect } from 'react';
+import { clearAgentActivity } from '../../engine/agents/agent-activity-store';
+import { useAgentActivity } from '../../hooks/useAgentActivity';
 import { type StringThemeKeys } from '../text/theme';
 import { ThemedText } from '../text/ThemedText';
 
@@ -60,7 +62,18 @@ export const AgentCallPart = React.memo(function AgentCallPart({ part }: AgentCa
 
     const isTerminal = part.state === 'output-available' || part.state === 'output-error' || part.state === 'output-denied';
 
-    // Parse structured output
+    // 终态时清理 store 中的活动数据，避免内存泄漏
+    useEffect(() => {
+        if (isTerminal) {
+            clearAgentActivity(part.toolCallId);
+        }
+    }, [isTerminal, part.toolCallId]);
+
+    // 实时活动数据（子代理执行期间）
+    const liveActivity = useAgentActivity(part.toolCallId);
+    const hasLiveActivity = !isTerminal && liveActivity && (liveActivity.text.length > 0 || liveActivity.steps.length > 0);
+
+    // Parse structured output (终态)
     const parsed = isTerminal && part.state === 'output-available' ? parseAgentOutput(part.output) : null;
     const activityLines = parsed?.activity ? parsed.activity.split('\n').filter(Boolean) : [];
     const resultText = parsed?.result ?? '';
@@ -68,6 +81,10 @@ export const AgentCallPart = React.memo(function AgentCallPart({ part }: AgentCa
 
     // Error output
     const errorText = isTerminal && part.state === 'output-error' ? (part.errorText?.slice(0, 120) ?? '') : '';
+
+    // 实时文本预览
+    const liveText = liveActivity?.text ?? '';
+    const liveTextPreview = liveText.length > 200 ? '…' + liveText.slice(-200) : liveText;
 
     return (
         <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
@@ -87,7 +104,31 @@ export const AgentCallPart = React.memo(function AgentCallPart({ part }: AgentCa
                 </ThemedText>
             </Box>
 
-            {/* Activity log: tool calls made by the sub-agent */}
+            {/* 实时活动：子代理执行期间 */}
+            {hasLiveActivity && (
+                <Box flexDirection="column" paddingLeft={3} marginTop={0}>
+                    {/* 实时工具调用 */}
+                    {liveActivity!.steps.map((step, i) => (
+                        <Box key={i} flexDirection="column">
+                            <ThemedText color="accent">
+                                {'→ '}
+                                {step.toolName}
+                                {step.input ? `(${step.input.length > 80 ? step.input.slice(0, 80) + '…' : step.input})` : ''}
+                            </ThemedText>
+                            {step.output && (
+                                <ThemedText color="textDim">
+                                    {'  ← '}
+                                    {step.output.length > 120 ? step.output.slice(0, 120) + '…' : step.output}
+                                </ThemedText>
+                            )}
+                        </Box>
+                    ))}
+                    {/* 实时文本输出 */}
+                    {liveTextPreview && <ThemedText color="textDim">{liveTextPreview}</ThemedText>}
+                </Box>
+            )}
+
+            {/* Activity log: tool calls made by the sub-agent (终态) */}
             {isTerminal && activityLines.length > 0 && (
                 <Box flexDirection="column" paddingLeft={3} marginTop={0}>
                     {activityLines.map((line, i) => (

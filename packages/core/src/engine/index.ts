@@ -9,4 +9,7 @@ export { getSystemPrompt, resetSystemPromptCache } from './config/system-prompt'
 
 // Agent Registry（从 @oagent/agents 重新导出）
 export { agentRegistry } from '@oagent/agents';
-export { setAgentEventEmitter } from './agents/agent-tool';
+export { setAgentEventEmitter, abortAll } from './agents/agent-tool';
+
+// 子代理实时活动 store
+export { getAgentActivity, subscribeAgentActivity, clearAgentActivity, type AgentActivity, type AgentStep } from './agents/agent-activity-store';

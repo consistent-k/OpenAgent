@@ -1,10 +1,35 @@
 import { agentRegistry, type AgentDefinition, type AgentResult, type AgentEventEmitter } from '@oagent/agents';
+import { t } from '@oagent/i18n';
 import { tool, streamText, stepCountIs, type ModelMessage } from 'ai';
 import { z } from 'zod';
 import { getProvider, getOrCreateProviderByConfig } from '../config/provider';
 import { tools as allTools } from '../tools';
+import { updateAgentActivity, type AgentStep } from './agent-activity-store';
 import { getProvider as getProviderConfig, getMaxSteps, getModelName } from '@/config';
 import { uid } from '@/utils/uid';
+
+// ── 全局取消控制器 ──
+// ESC 时调用 abortAll()，所有正在执行的工具（包括子代理）都会收到 abort 信号
+let globalAbortController = new AbortController();
+
+/** 获取当前全局 abort signal（与传入的 signal 合并使用） */
+function getGlobalAbortSignal(): AbortSignal {
+    return globalAbortController.signal;
+}
+
+/** 终止所有正在执行的工具和子代理 */
+export function abortAll(): void {
+    globalAbortController.abort();
+    globalAbortController = new AbortController();
+}
+
+/** 合并多个 abort signal 为一个（任一触发即终止） */
+function mergeSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {
+    const valid = signals.filter(Boolean) as AbortSignal[];
+    if (valid.length === 0) return new AbortController().signal;
+    if (valid.length === 1) return valid[0]!;
+    return AbortSignal.any(valid);
+}
 
 /** Global event emitter for sub-agent activity (set by TUI layer) */
 let globalEmitter: AgentEventEmitter | null = null;
@@ -15,13 +40,6 @@ export function setAgentEventEmitter(emitter: AgentEventEmitter | null): void {
 
 export function getAgentEventEmitter(): AgentEventEmitter | null {
     return globalEmitter;
-}
-
-/** A single tool-call step in the sub-agent's execution */
-interface AgentStep {
-    toolName: string;
-    input: string;
-    output?: string;
 }
 
 /**
@@ -69,7 +87,7 @@ export function resolveAgentModel(agentDef: AgentDefinition, maxRetries: number)
 }
 
 /** Helper to run a sub-agent to completion and return structured result */
-async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, abortSignal?: AbortSignal): Promise<string> {
+async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, abortSignal?: AbortSignal, toolCallId?: string): Promise<string> {
     const runId = uid();
     const emitter = globalEmitter;
     emitter?.onAgentStart(agentDef.id, runId);
@@ -82,13 +100,16 @@ async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, a
 
         const messages: ModelMessage[] = [{ role: 'user', content: taskMessage }];
 
+        // 合并外部 abortSignal 和全局 abortSignal（ESC 硬终止）
+        const mergedSignal = mergeSignals(abortSignal, getGlobalAbortSignal());
+
         const result = streamText({
             model,
             stopWhen: stepCountIs(maxSteps),
             system: agentDef.systemPrompt,
             messages,
             tools: agentTools as Parameters<typeof streamText>[0]['tools'],
-            abortSignal,
+            abortSignal: mergedSignal,
             maxRetries
         });
 
@@ -101,28 +122,48 @@ async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, a
                 case 'text-delta':
                     fullText += event.text;
                     emitter?.onAgentText(agentDef.id, runId, event.text);
+                    if (toolCallId) {
+                        updateAgentActivity(toolCallId, (prev) => ({ ...prev, text: prev.text + event.text }));
+                    }
                     break;
 
                 case 'tool-call': {
                     const inputStr = typeof event.input === 'string' ? event.input : JSON.stringify(event.input);
-                    steps.push({
+                    const step = {
                         toolName: event.toolName,
                         input: truncate(inputStr, 200)
-                    });
+                    };
+                    steps.push(step);
                     emitter?.onAgentToolCall(agentDef.id, runId, event.toolName, event.input);
+                    if (toolCallId) {
+                        updateAgentActivity(toolCallId, (prev) => ({ ...prev, steps: [...prev.steps, step] }));
+                    }
                     break;
                 }
 
                 case 'tool-result': {
                     const outputStr = typeof event.output === 'string' ? event.output : JSON.stringify(event.output);
+                    const truncated = truncate(outputStr, 300);
                     // Find the matching tool-call step and fill in its output
                     for (let i = steps.length - 1; i >= 0; i--) {
                         if (steps[i]!.output === undefined) {
-                            steps[i]!.output = truncate(outputStr, 300);
+                            steps[i]!.output = truncated;
                             break;
                         }
                     }
                     emitter?.onAgentToolResult(agentDef.id, runId, event.toolName ?? '', event.output);
+                    if (toolCallId) {
+                        updateAgentActivity(toolCallId, (prev) => {
+                            const newSteps = [...prev.steps];
+                            for (let i = newSteps.length - 1; i >= 0; i--) {
+                                if (newSteps[i]!.output === undefined) {
+                                    newSteps[i] = { ...newSteps[i]!, output: truncated };
+                                    break;
+                                }
+                            }
+                            return { ...prev, steps: newSteps };
+                        });
+                    }
                     break;
                 }
             }
@@ -162,6 +203,17 @@ async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, a
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         emitter?.onAgentError(agentDef.id, runId, errorMsg);
+        // 被 abort 时返回取消结果而非抛错，让主会话能正常继续
+        if (error instanceof Error && error.name === 'AbortError') {
+            return JSON.stringify({
+                agent: agentDef.name,
+                completed: false,
+                steps: 0,
+                usage: '',
+                activity: '',
+                result: `⚠️ ${t('error.streamInterrupted')}`
+            });
+        }
         throw error;
     }
 }
@@ -209,9 +261,9 @@ export function createAgentTool(agentDef: AgentDefinition) {
             task: z.string().describe('The task or question to delegate to this agent. Be specific and provide all necessary context.'),
             context: z.string().optional().describe('Additional context, file paths, or relevant information for the agent.')
         }),
-        execute: async ({ task, context }, { abortSignal }) => {
+        execute: async ({ task, context }, { abortSignal, toolCallId }) => {
             const taskMessage = context ? `Task: ${task}\n\nAdditional Context:\n${context}` : `Task: ${task}`;
-            return executeAgentRun(agentDef, taskMessage, abortSignal);
+            return executeAgentRun(agentDef, taskMessage, abortSignal, toolCallId);
         }
     });
 }
@@ -260,7 +312,7 @@ export function createParallelAgentTool() {
                 .max(5)
                 .describe('List of tasks to run in parallel (max 5). Each task specifies an agent and what to do.')
         }),
-        execute: async ({ tasks }, { abortSignal }) => {
+        execute: async ({ tasks }, { abortSignal, toolCallId: parentToolCallId }) => {
             // Validate all agent IDs
             for (const t of tasks) {
                 if (!agentRegistry.get(t.agentId)) {
@@ -274,10 +326,11 @@ export function createParallelAgentTool() {
             }
 
             const results = await Promise.allSettled(
-                tasks.map(async (t) => {
+                tasks.map(async (t, index) => {
                     const agentDef = agentRegistry.get(t.agentId)!;
                     const taskMessage = t.context ? `Task: ${t.task}\n\nAdditional Context:\n${t.context}` : `Task: ${t.task}`;
-                    const result = await executeAgentRun(agentDef, taskMessage, abortSignal);
+                    const compositeKey = parentToolCallId ? `${parentToolCallId}_${t.agentId}_${index}` : undefined;
+                    const result = await executeAgentRun(agentDef, taskMessage, abortSignal, compositeKey);
                     return {
                         agentId: t.agentId,
                         task: t.task,
@@ -323,7 +376,7 @@ export function createHandoffTool(currentAgentId?: string) {
             message: z.string().describe('The message or instructions to pass to the target agent. Include any context from the current conversation that the next agent needs.'),
             context: z.string().optional().describe('Additional structured context (e.g., file paths, findings so far)')
         }),
-        execute: async ({ agentId, message, context }, { abortSignal }) => {
+        execute: async ({ agentId, message, context }, { abortSignal, toolCallId }) => {
             const agentDef = agentRegistry.get(agentId);
             if (!agentDef) {
                 throw new Error(
@@ -335,7 +388,7 @@ export function createHandoffTool(currentAgentId?: string) {
             }
 
             const handoffMessage = context ? `${message}\n\n---\nContext:\n${context}` : message;
-            return executeAgentRun(agentDef, handoffMessage, abortSignal);
+            return executeAgentRun(agentDef, handoffMessage, abortSignal, toolCallId);
         }
     });
     if (!currentAgentId) cachedHandoffTool = handoffTool;

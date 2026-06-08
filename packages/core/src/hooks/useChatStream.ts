@@ -4,7 +4,7 @@ import type { ModelMessage, UIMessage, UIMessageChunk, DynamicToolUIPart, ToolUI
 import { convertToModelMessages, getToolName, isToolUIPart, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getModelName, getActiveProviderName, isConfigReady } from '../config';
-import { runAgent } from '../engine';
+import { runAgent, abortAll } from '../engine';
 import { setRetryCallback, clearRetryCallback, type RetryInfo } from '../engine/middleware/retry-notification';
 import { setToolApproval } from '../engine/tools/utils/approval-store';
 import { extractApiErrorMessage } from '../utils/errors';
@@ -92,9 +92,37 @@ function findPendingApproval(messages: UIMessage[]): PendingToolApproval | null 
     return null;
 }
 
-/** sendAutomaticallyWhen 回调（无闭包依赖，提取为模块级函数避免每次渲染重建） */
+/** 终态判断（与 AgentCallPart.tsx、ToolCallPart.tsx 保持一致） */
+function isTerminalToolState(state: string): boolean {
+    return state === 'output-available' || state === 'output-error' || state === 'output-denied';
+}
+
+/**
+ * 扫描最后一条 assistant 消息的工具状态，返回 { hasActive, allFinished }。
+ * hasActive: 是否有正在执行的工具（非终态）
+ * allFinished: 所有工具调用是否都已到达终态
+ */
+function getToolExecutionStatus(messages: UIMessage[]): { hasActive: boolean; allFinished: boolean } {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.role !== 'assistant') continue;
+        let hasToolCalls = false;
+        let hasActive = false;
+        for (const part of msg.parts) {
+            if (!isToolUIPart(part)) continue;
+            hasToolCalls = true;
+            const toolPart = part as DynamicToolUIPart | ToolUIPart;
+            if (!isTerminalToolState(toolPart.state)) {
+                hasActive = true;
+            }
+        }
+        return { hasActive, allFinished: hasToolCalls && !hasActive };
+    }
+    return { hasActive: false, allFinished: false };
+}
+
 function shouldSendAutomatically({ messages }: { messages: UIMessage[] }) {
-    return lastAssistantMessageIsCompleteWithToolCalls({ messages }) || lastAssistantMessageIsCompleteWithApprovalResponses({ messages });
+    return lastAssistantMessageIsCompleteWithToolCalls({ messages }) || lastAssistantMessageIsCompleteWithApprovalResponses({ messages }) || getToolExecutionStatus(messages).allFinished;
 }
 
 /** 包装流：跟踪 tool-call 生命周期，流结束时自动补发缺失的 tool-output-error chunk，同时抑制 AI SDK 内部的 console.error */
@@ -235,8 +263,10 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
     const status: ChatStatus = useMemo(() => {
         if (pendingApproval) return 'awaiting_approval';
         if (chatStatus === 'submitted' || chatStatus === 'streaming') return 'streaming';
+        // 工具执行中（如子代理运行）也视为 streaming，允许 ESC/Ctrl+C 取消
+        if (getToolExecutionStatus(displayMessages).hasActive) return 'streaming';
         return 'idle';
-    }, [chatStatus, pendingApproval]);
+    }, [chatStatus, pendingApproval, displayMessages]);
 
     const [messages, setModelMessages] = useState<ModelMessage[]>([]);
     // 流结束后：同步 model messages、清除重试回调、更新 tip
@@ -353,6 +383,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
     }, [stop, setMessages]);
 
     const cancel = useCallback(() => {
+        abortAll();
         stop();
     }, [stop]);
 
