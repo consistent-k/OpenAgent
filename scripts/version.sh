@@ -39,12 +39,14 @@ if [[ "$BUMP" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     NEW_VERSION="$BUMP"
 else
     NEW_VERSION=$(node -p "
-    const [major, minor, patch] = '$CURRENT'.split('.').map(Number);
-    if ('$BUMP' === 'major') return \`\${major + 1}.0.0\`;
-    if ('$BUMP' === 'minor') return \`\${major}.\${minor + 1}.0\`;
-    if ('$BUMP' === 'patch') return \`\${major}.\${minor}.\${patch + 1}\`;
-    console.error('Invalid bump: $BUMP');
-    process.exit(1);
+    (() => {
+        const [major, minor, patch] = '$CURRENT'.split('.').map(Number);
+        if ('$BUMP' === 'major') return \`\${major + 1}.0.0\`;
+        if ('$BUMP' === 'minor') return \`\${major}.\${minor + 1}.0\`;
+        if ('$BUMP' === 'patch') return \`\${major}.\${minor}.\${patch + 1}\`;
+        console.error('Invalid bump: $BUMP');
+        process.exit(1);
+    })();
     ")
 fi
 
