@@ -57,6 +57,18 @@ echo ""
 # ── 4. 发布所有包（pnpm -r 自动按依赖顺序，跳过 private） ──
 echo "🚀 Publishing all packages..."
 cd "$ROOT" && pnpm -r publish --access public --no-git-checks $DRY_RUN
+echo ""
+
+# ── 5. 发布后打 tag（正式发布时） ───────────────────
+if [[ -z "$DRY_RUN" ]]; then
+    TAG="v$VERSION"
+    if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+        git tag "$TAG"
+        echo "✅ 已创建 tag $TAG"
+        echo "📤 请手动推送 tag:"
+        echo "   git push origin $TAG"
+    fi
+fi
 
 echo ""
 echo "✅ All packages published at v$VERSION!"
