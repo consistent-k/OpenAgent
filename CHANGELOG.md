@@ -2,6 +2,23 @@
 
 本文档记录 OpenAgent 的所有重要变更。
 
+## [1.1.2](https://github.com/consistent-k/OpenAgent/compare/v1.1.1...v1.1.2) (2026-06-10)
+
+### ✨ 新功能
+
+- 统一子代理工具与流式执行重构 ([95b7131](https://github.com/consistent-k/OpenAgent/commit/95b7131))
+- active model 改为列表选择替代手动输入 ([f7294d1](https://github.com/consistent-k/OpenAgent/commit/f7294d1))
+- 子代理运行过程实时展示与 ESC 硬终止支持 ([b82a998](https://github.com/consistent-k/OpenAgent/commit/b82a998))
+
+### 🐛 Bug 修复
+
+- 修复 version.sh 中 node -p 的 return 语句错误 ([50913d1](https://github.com/consistent-k/OpenAgent/commit/50913d1))
+- 修复 release-please tag 格式，移除 oa component 前缀 ([95c3436](https://github.com/consistent-k/OpenAgent/commit/95c3436))
+
+### ♻️ 重构
+
+- 迁移版本管理至自定义脚本，新增 changelog-collect 技能 ([691d551](https://github.com/consistent-k/OpenAgent/commit/691d551))
+
 ## [1.1.1](https://github.com/consistent-k/OpenAgent/compare/v1.1.0...v1.1.1) (2026-06-08)
 
 ### 🐛 Bug 修复
