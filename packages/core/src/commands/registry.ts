@@ -1,3 +1,4 @@
+import type { AgentEventEmitter } from '@oagent/agents';
 import type { UIMessage } from 'ai';
 import type { ThemeName } from '../ui/text/theme';
 import type { SessionSummary } from '../utils/sessions';
@@ -23,6 +24,16 @@ export interface CommandContext {
     showThemePicker: () => void;
     showConfigPicker: () => void;
     showProviderPicker: () => void;
+    /** 直接执行子代理，返回结果文本 */
+    executeAgent: (agentId: string, task: string, emitter?: AgentEventEmitter | null) => Promise<string>;
+    /** 创建流式消息（在消息列表中显示为 streaming 状态） */
+    startStreaming?: (messageId: string) => void;
+    /** 实时推送子代理文本输出（流式 delta，追加到流式消息） */
+    streamText?: (text: string) => void;
+    /** 结束流式消息（替换文本为最终结果，状态改为 done） */
+    endStreaming?: (messageId: string, finalText: string) => void;
+    /** 设置子代理运行状态（用于 Header 显示） */
+    setSubAgentRunning?: (name: string | null) => void;
 }
 
 export interface SlashCommand {

@@ -59,7 +59,6 @@ oa
 
 ## 命令
 
-- `/help`：查看所有可用命令
 - `/status`：查看当前工作目录和文件索引状态
 - `/config`：打开配置选择器，编辑配置文件
 - `/approvals`：管理工具审批偏好（execute_bash/write_file/edit_file）
@@ -72,9 +71,55 @@ oa
 - `/sessions`：列出并恢复已保存会话
 - `/clear`：保存当前会话并开始新会话
 - `/update`：检查并更新 oa 到最新版本
+- `/agents`：列出所有可用的子代理
+- `/<agent-id> <任务>`：直接调用子代理执行任务（如 `/researcher 分析这段代码`）
 - `/exit`：保存会话、停止所有渠道、退出
 
 > 每次 `/clear` 时自动保存当前会话到 `~/.openagent/sessions/<sessionId>.json`，历史记录追加到 `~/.openagent/history.jsonl`。
+
+## 子代理系统
+
+OA 支持子代理（Sub-Agent）系统，允许将特定任务委派给专门的代理执行。
+
+### 使用方式
+
+1. **查看可用代理**：输入 `/agents` 查看所有已注册的子代理
+2. **直接调用代理**：输入 `/<agent-id> <任务>` 直接执行子代理
+    - 示例：`/researcher 分析这段代码`
+    - 示例：`/doc-writer 更新 README.md`
+3. **并行执行**：使用 `run_agents_parallel` 工具同时运行多个代理
+4. **代理委派**：使用 `agent_handoff` 工具将当前任务委派给另一个代理
+
+### 配置代理
+
+代理定义来自三个来源（按优先级）：
+
+1. **内置代理**：系统自带的基础代理
+2. **项目代理**：项目根目录的 `AGENTS.md` 文件
+3. **用户配置**：`~/.openagent/config.json` 中的 `agents` 数组
+
+在 `config.json` 中添加自定义代理：
+
+```json
+{
+    "agents": [
+        {
+            "id": "doc-writer",
+            "name": "文档写手",
+            "description": "专门用于编写和更新文档",
+            "systemPrompt": "你是一个专业的技术文档写手...",
+            "allowedTools": ["readFile", "writeFile", "editFile"],
+            "model": "deepseek-v3.2",
+            "maxSteps": 10
+        }
+    ]
+}
+```
+
+### 代理工具
+
+- `run_agents_parallel`：并行运行多个子代理任务
+- `agent_handoff`：将当前任务委派给指定代理
 
 ## Channel 插件系统
 

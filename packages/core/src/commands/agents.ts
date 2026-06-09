@@ -28,7 +28,7 @@ export const agentsCommand: SlashCommand = {
                 const tools = a.allowedTools ? a.allowedTools.join(', ') : 'all';
                 const source = `[${a.source}]`;
                 const model = a.model ? ` | Model: ${a.model}` : '';
-                return `- **${a.name}** (${a.id}) ${source}\n  ${a.description}\n  Tools: ${tools}${model}`;
+                return `- **${a.name}** (/${a.id}) ${source}\n  ${a.description}\n  Tools: ${tools}${model}`;
             })
             .join('\n\n');
 
@@ -37,7 +37,7 @@ export const agentsCommand: SlashCommand = {
             {
                 id: uid(),
                 role: 'assistant',
-                parts: [{ type: 'text', text: `## ${t('command.agents.title')}\n\n${list}`, state: 'done' }]
+                parts: [{ type: 'text', text: `## ${t('command.agents.title')}\n\n${list}\n\n${t('command.agents.hint')}`, state: 'done' }]
             }
         ]);
     }

@@ -3,9 +3,6 @@
  */
 export const en: Record<string, string> = {
     // ── Command descriptions ──
-    'command.help.description': 'Show all available commands; use /help <command> to view a single command',
-    'command.help.availableCommands': 'Available commands:\n{helpText}',
-
     'command.status.description': 'Show current working directory, file index count and session status',
     'command.status.workingDirectory': 'Working directory: {cwd}',
     'command.status.fileIndex': 'File index: {count} items',
@@ -93,6 +90,11 @@ export const en: Record<string, string> = {
     'command.agents.description': 'List available sub-agents',
     'command.agents.title': 'Available Agents',
     'command.agents.none': 'No sub-agents registered. Define agents in AGENTS.md or config.json.',
+    'command.agents.hint': '💡 Invoke directly with /<agent-id> <task>, e.g.: /researcher analyze this code',
+
+    'command.agent.noTask': 'Please provide a task. Usage: /{id} <task>',
+    'command.agent.notFound': 'Agent not found: {id}',
+    'command.agent.error': 'Agent execution error: {error}',
 
     // ── UI components ──
     'ui.approval.approve': 'Approve',
@@ -192,6 +194,7 @@ export const en: Record<string, string> = {
     'status.header.awaitingApproval': 'awaiting approval',
     'status.header.streaming': 'streaming...',
     'status.header.idle': 'idle',
+    'status.header.subAgentRunning': 'Agent running: {name}',
     'status.header.modelLabel': 'model: ',
 
     'status.bar.inputLabel': 'in:',
@@ -208,6 +211,7 @@ export const en: Record<string, string> = {
 
     'tool.agent.parallel': 'Parallel Execution',
     'tool.agent.handoff': 'Agent Handoff',
+    'tool.agent.default': 'General Agent',
     'tool.agent.preparing': 'Preparing...',
     'tool.agent.pending': 'Waiting',
     'tool.agent.running': 'Running',
@@ -235,6 +239,18 @@ export const en: Record<string, string> = {
     'tool.verb.urls': 'urls',
     'tool.verb.query': 'query',
     'tool.verb.queries': 'queries',
+
+    // ── Tool labels (for channel notifications) ──
+    'tool.label.readFile': 'Read file',
+    'tool.label.writeFile': 'Write file',
+    'tool.label.editFile': 'Edit file',
+    'tool.label.executeBash': 'Execute command',
+    'tool.label.grep': 'Search code',
+    'tool.label.glob': 'Search files',
+    'tool.label.fetch': 'Fetch URL',
+    'tool.label.readDirectory': 'List directory',
+    'tool.label.webSearch': 'Web search',
+    'tool.label.askUserQuestion': 'Ask user',
 
     'tool.group.errorCount': '({count} error{s})',
     'tool.group.expandHint': '(Ctrl+O to expand)',
@@ -272,6 +288,11 @@ export const en: Record<string, string> = {
     'tool.webSearch.parseError': 'Unable to parse search API response format',
     'tool.webSearch.noResults': 'No results found',
     'tool.webSearch.searchFailed': 'Search failed: {error}',
+
+    // ── Channel notifications ──
+    'channel.error.processFailed': 'Processing error',
+    'channel.notify.usingTool': '🔧 Using tool: {tool}...',
+    'channel.notify.thinking': '🤔 Thinking...',
 
     // ── Error messages ──
     'error.configNotReady': '⚠️ Configuration incomplete. Please run /config to set baseUrl, apiKey, and model',

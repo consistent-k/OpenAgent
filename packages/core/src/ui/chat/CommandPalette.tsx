@@ -1,8 +1,8 @@
 import { t } from '@oagent/i18n';
+import { Box, Text } from 'ink';
 import React from 'react';
 import type { SlashCommand } from '../../commands';
-import { ListItem } from '../text/ListItem';
-import { ThemedBox } from '../text/ThemedBox';
+import { useTheme } from '../text/theme';
 
 interface CommandPaletteProps {
     commands: SlashCommand[];
@@ -10,23 +10,31 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ commands, selectedIndex }: CommandPaletteProps) {
+    const { theme } = useTheme();
+
     if (commands.length === 0) {
         return (
-            <ThemedBox borderColor="border" paddingX={1}>
-                <ListItem isFocused={false} disabled>
-                    {t('ui.commandPalette.noMatch')}
-                </ListItem>
-            </ThemedBox>
+            <Box paddingX={1}>
+                <Text color={theme.inactive}>{t('ui.commandPalette.noMatch')}</Text>
+            </Box>
         );
     }
 
     return (
-        <ThemedBox borderColor="border" flexDirection="column" paddingX={1}>
+        <>
             {commands.map((cmd, i) => (
-                <ListItem key={cmd.name} isFocused={i === selectedIndex}>
-                    {cmd.name} — {cmd.getDescription()}
-                </ListItem>
+                <Box key={cmd.name} paddingX={1}>
+                    <Box width={2}>
+                        <Text color={i === selectedIndex ? theme.suggestion : undefined}>{i === selectedIndex ? '❯' : ' '}</Text>
+                    </Box>
+                    <Box width={25}>
+                        <Text>{cmd.name}</Text>
+                    </Box>
+                    <Box>
+                        <Text dimColor>{cmd.getDescription()}</Text>
+                    </Box>
+                </Box>
             ))}
-        </ThemedBox>
+        </>
     );
 }

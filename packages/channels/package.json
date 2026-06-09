@@ -33,6 +33,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@oagent/i18n": "workspace:*",
         "ai": "^6.0.195"
     },
     "devDependencies": {

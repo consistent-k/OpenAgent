@@ -1,8 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { agentRegistry, registerBuiltinAgents, parseAgentsMarkdown, type AgentDefinition } from '@oagent/agents';
-import { CONFIG_PATH, type UserAgentConfig } from '@/config';
-import { readJsonFile } from '@/utils/fs';
+import { getConfiguredAgents, getConfiguredAgentPlugins, type UserAgentConfig } from '@/config';
 
 /**
  * Load all agent definitions from all sources.
@@ -14,10 +13,9 @@ export async function loadAllAgents(): Promise<void> {
     registerBuiltinAgents();
     loadProjectAgents();
 
-    // Read config once for both user agents and plugins
-    const config = readJsonFile<{ agents?: UserAgentConfig[]; agentPlugins?: string[] }>(CONFIG_PATH);
-    loadUserConfigAgents(config?.agents);
-    await loadAgentPlugins(config?.agentPlugins);
+    // Use cached config getters (avoids redundant file I/O)
+    loadUserConfigAgents(getConfiguredAgents());
+    await loadAgentPlugins(getConfiguredAgentPlugins());
 }
 
 function loadProjectAgents(): void {
@@ -44,6 +42,7 @@ function loadUserConfigAgents(agents?: UserAgentConfig[]): void {
                 description: ua.description ?? '',
                 systemPrompt: ua.systemPrompt,
                 allowedTools: ua.allowedTools,
+                disallowedTools: ua.disallowedTools,
                 model: ua.model,
                 maxSteps: ua.maxSteps,
                 maxRetries: ua.maxRetries,

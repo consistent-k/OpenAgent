@@ -2,7 +2,7 @@ import { t } from '@oagent/i18n';
 import { Box, useInput } from 'ink';
 import type { ReactNode } from 'react';
 import React, { useCallback, useMemo, useState } from 'react';
-import { COMMANDS } from '../../commands';
+import { COMMANDS, type SlashCommand } from '../../commands';
 import { filterFiles, getActiveMention, type FileEntry } from '../../utils/files';
 import { Divider } from '../text/Divider';
 import { ThemedBox } from '../text/ThemedBox';
@@ -21,10 +21,11 @@ interface InputProps {
     disabled: boolean;
     fileIndex: FileEntry[];
     mode: InputMode;
+    agentCommands?: SlashCommand[];
     children?: ReactNode;
 }
 
-export function Input({ value, onChange, onSubmit, disabled, fileIndex, mode, children }: InputProps) {
+export function Input({ value, onChange, onSubmit, disabled, fileIndex, mode, agentCommands = [], children }: InputProps) {
     // ---- Internal state ----
     const [commandIndex, setCommandIndex] = useState(0);
     const [fileIndexState, setFileIndexState] = useState(0);
@@ -32,9 +33,11 @@ export function Input({ value, onChange, onSubmit, disabled, fileIndex, mode, ch
     // ---- Derived data ----
     const filteredCommands = useMemo(() => {
         if (!value.startsWith('/') || /\s/.test(value)) return [];
-        if (value === '/') return COMMANDS;
-        return COMMANDS.filter((cmd) => cmd.name.startsWith(value));
-    }, [value]);
+        // 合并静态命令 + 动态 agent 命令（静态优先去重）
+        const allCommands = [...COMMANDS, ...agentCommands.filter((ac) => !COMMANDS.some((c) => c.name === ac.name))];
+        if (value === '/') return allCommands;
+        return allCommands.filter((cmd) => cmd.name.startsWith(value));
+    }, [value, agentCommands]);
 
     const fileMatches = useMemo(() => {
         const activeMention = getActiveMention(value);

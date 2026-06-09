@@ -5,7 +5,9 @@ import { z } from 'zod';
 import { getProvider, getOrCreateProviderByConfig } from '../config/provider';
 import { tools as allTools } from '../tools';
 import { updateAgentActivity, type AgentStep } from './agent-activity-store';
+import { registerBackgroundTask, updateBackgroundTask } from './background-task-store';
 import { getProvider as getProviderConfig, getMaxSteps, getModelName } from '@/config';
+import { truncate } from '@/utils/truncate';
 import { uid } from '@/utils/uid';
 
 // ── 全局取消控制器 ──
@@ -44,9 +46,23 @@ export function getAgentEventEmitter(): AgentEventEmitter | null {
 
 /**
  * Resolve which tools an agent is allowed to use.
- * If allowedTools is undefined, returns all tools without copying.
+ * If disallowedTools is set, it takes precedence (denylist mode).
+ * If allowedTools is set, only those tools are included (allowlist mode).
+ * If neither is set, returns all tools.
  */
 export function resolveAgentTools(agentDef: AgentDefinition) {
+    // Denylist mode: disallowedTools takes precedence
+    if (agentDef.disallowedTools && agentDef.disallowedTools.length > 0) {
+        const filtered: Record<string, (typeof allTools)[keyof typeof allTools]> = {};
+        for (const [name, tool] of Object.entries(allTools)) {
+            if (!agentDef.disallowedTools.includes(name)) {
+                filtered[name] = tool;
+            }
+        }
+        return filtered;
+    }
+
+    // Allowlist mode
     if (!agentDef.allowedTools || agentDef.allowedTools.length === 0) {
         return allTools;
     }
@@ -86,11 +102,39 @@ export function resolveAgentModel(agentDef: AgentDefinition, maxRetries: number)
     return getProvider(maxRetries)(getModelName());
 }
 
-/** Helper to run a sub-agent to completion and return structured result */
-async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, abortSignal?: AbortSignal, toolCallId?: string): Promise<string> {
+/** Structured result from a sub-agent run (typed, no JSON parsing needed) */
+export interface AgentRunResult {
+    agent: string;
+    completed: boolean;
+    steps: number;
+    usage: string;
+    activity: string;
+    result: string;
+}
+
+/** Messages yielded by the async generator during agent execution */
+export type AgentRunMessage =
+    | { type: 'text-delta'; agentId: string; runId: string; text: string }
+    | { type: 'tool-call'; agentId: string; runId: string; toolName: string; input: unknown }
+    | { type: 'tool-result'; agentId: string; runId: string; toolName: string; output: unknown }
+    | { type: 'complete'; result: AgentRunResult }
+    | { type: 'error'; error: string };
+
+/**
+ * Async generator that executes a sub-agent and yields messages as they arrive.
+ * This is the canonical execution path; executeAgentRun() wraps it for callers
+ * that just need the final result.
+ */
+export async function* executeAgentRunGenerator(
+    agentDef: AgentDefinition,
+    taskMessage: string,
+    abortSignal?: AbortSignal,
+    toolCallId?: string,
+    emitter?: AgentEventEmitter | null
+): AsyncGenerator<AgentRunMessage> {
     const runId = uid();
-    const emitter = globalEmitter;
-    emitter?.onAgentStart(agentDef.id, runId);
+    const effectiveEmitter = emitter ?? globalEmitter;
+    effectiveEmitter?.onAgentStart(agentDef.id, runId);
 
     try {
         const agentTools = resolveAgentTools(agentDef);
@@ -100,8 +144,9 @@ async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, a
 
         const messages: ModelMessage[] = [{ role: 'user', content: taskMessage }];
 
-        // 合并外部 abortSignal 和全局 abortSignal（ESC 硬终止）
-        const mergedSignal = mergeSignals(abortSignal, getGlobalAbortSignal());
+        // 合并外部 abortSignal、全局 abortSignal（ESC 硬终止）和 per-run controller
+        const runController = new AbortController();
+        const mergedSignal = mergeSignals(abortSignal, getGlobalAbortSignal(), runController.signal);
 
         const result = streamText({
             model,
@@ -113,7 +158,6 @@ async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, a
             maxRetries
         });
 
-        // Collect full stream: text + tool calls + tool results
         let fullText = '';
         const steps: AgentStep[] = [];
 
@@ -121,37 +165,35 @@ async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, a
             switch (event.type) {
                 case 'text-delta':
                     fullText += event.text;
-                    emitter?.onAgentText(agentDef.id, runId, event.text);
+                    effectiveEmitter?.onAgentText(agentDef.id, runId, event.text);
                     if (toolCallId) {
                         updateAgentActivity(toolCallId, (prev) => ({ ...prev, text: prev.text + event.text }));
                     }
+                    yield { type: 'text-delta', agentId: agentDef.id, runId, text: event.text };
                     break;
 
                 case 'tool-call': {
                     const inputStr = typeof event.input === 'string' ? event.input : JSON.stringify(event.input);
-                    const step = {
-                        toolName: event.toolName,
-                        input: truncate(inputStr, 200)
-                    };
+                    const step = { toolName: event.toolName, input: truncate(inputStr, 200) };
                     steps.push(step);
-                    emitter?.onAgentToolCall(agentDef.id, runId, event.toolName, event.input);
+                    effectiveEmitter?.onAgentToolCall(agentDef.id, runId, event.toolName, event.input);
                     if (toolCallId) {
                         updateAgentActivity(toolCallId, (prev) => ({ ...prev, steps: [...prev.steps, step] }));
                     }
+                    yield { type: 'tool-call', agentId: agentDef.id, runId, toolName: event.toolName, input: event.input };
                     break;
                 }
 
                 case 'tool-result': {
                     const outputStr = typeof event.output === 'string' ? event.output : JSON.stringify(event.output);
                     const truncated = truncate(outputStr, 300);
-                    // Find the matching tool-call step and fill in its output
                     for (let i = steps.length - 1; i >= 0; i--) {
                         if (steps[i]!.output === undefined) {
                             steps[i]!.output = truncated;
                             break;
                         }
                     }
-                    emitter?.onAgentToolResult(agentDef.id, runId, event.toolName ?? '', event.output);
+                    effectiveEmitter?.onAgentToolResult(agentDef.id, runId, event.toolName ?? '', event.output);
                     if (toolCallId) {
                         updateAgentActivity(toolCallId, (prev) => {
                             const newSteps = [...prev.steps];
@@ -164,6 +206,7 @@ async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, a
                             return { ...prev, steps: newSteps };
                         });
                     }
+                    yield { type: 'tool-result', agentId: agentDef.id, runId, toolName: event.toolName ?? '', output: event.output };
                     break;
                 }
             }
@@ -186,41 +229,56 @@ async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, a
             stepsUsed: steps.length
         };
 
-        emitter?.onAgentEnd(agentDef.id, runId, agentResult);
+        effectiveEmitter?.onAgentEnd(agentDef.id, runId, agentResult);
 
-        // Build human-readable output with activity log
         const activityLog = formatActivityLog(steps);
         const usageStr = agentResult.usage ? ` (${agentResult.usage.inputTokens}in/${agentResult.usage.outputTokens}out)` : '';
 
-        return JSON.stringify({
-            agent: agentDef.name,
-            completed: agentResult.completed,
-            steps: agentResult.stepsUsed,
-            usage: usageStr,
-            activity: activityLog,
-            result: agentResult.text
-        });
+        yield {
+            type: 'complete',
+            result: {
+                agent: agentDef.name,
+                completed: agentResult.completed,
+                steps: agentResult.stepsUsed,
+                usage: usageStr,
+                activity: activityLog,
+                result: agentResult.text
+            }
+        };
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
-        emitter?.onAgentError(agentDef.id, runId, errorMsg);
-        // 被 abort 时返回取消结果而非抛错，让主会话能正常继续
+        effectiveEmitter?.onAgentError(agentDef.id, runId, errorMsg);
         if (error instanceof Error && error.name === 'AbortError') {
-            return JSON.stringify({
-                agent: agentDef.name,
-                completed: false,
-                steps: 0,
-                usage: '',
-                activity: '',
-                result: `⚠️ ${t('error.streamInterrupted')}`
-            });
+            yield {
+                type: 'complete',
+                result: {
+                    agent: agentDef.name,
+                    completed: false,
+                    steps: 0,
+                    usage: '',
+                    activity: '',
+                    result: `⚠️ ${t('error.streamInterrupted')}`
+                }
+            };
+        } else {
+            yield { type: 'error', error: errorMsg };
         }
-        throw error;
     }
 }
 
-function truncate(str: string, maxLen: number): string {
-    if (str.length <= maxLen) return str;
-    return str.slice(0, maxLen) + '…';
+/** Run a sub-agent to completion and return structured result (wraps the generator) */
+export async function executeAgentRun(agentDef: AgentDefinition, taskMessage: string, abortSignal?: AbortSignal, toolCallId?: string, emitter?: AgentEventEmitter | null): Promise<AgentRunResult> {
+    let finalResult: AgentRunResult | null = null;
+    for await (const msg of executeAgentRunGenerator(agentDef, taskMessage, abortSignal, toolCallId, emitter)) {
+        if (msg.type === 'complete') finalResult = msg.result;
+        if (msg.type === 'error') throw new Error(msg.error);
+    }
+    return finalResult!;
+}
+
+/** Stringify AgentRunResult for use as AI tool output */
+export function stringifyAgentResult(result: AgentRunResult): string {
+    return JSON.stringify(result);
 }
 
 function formatActivityLog(steps: AgentStep[]): string {
@@ -237,160 +295,128 @@ function formatActivityLog(steps: AgentStep[]): string {
     return lines.join('\n');
 }
 
-/** Cached agent tools — invalidated on reload */
-let cachedAgentTools: Record<string, ReturnType<typeof createAgentTool>> | null = null;
+/** Cached unified agent tool — invalidated on reload */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let cachedParallelTool: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let cachedHandoffTool: any = null;
+let cachedUnifiedTool: any = null;
 
 /** Invalidate cached agent tools (called on /reload) */
 export function invalidateAgentToolCache(): void {
-    cachedAgentTools = null;
-    cachedParallelTool = null;
-    cachedHandoffTool = null;
+    cachedUnifiedTool = null;
 }
 
 /**
- * Create a tool that wraps a single sub-agent.
+ * Resolve the default agent when subagent_type is not specified.
+ * Prefers 'planner', then first registered agent.
  */
-export function createAgentTool(agentDef: AgentDefinition) {
-    return tool({
-        description: agentDef.description,
-        inputSchema: z.object({
-            task: z.string().describe('The task or question to delegate to this agent. Be specific and provide all necessary context.'),
-            context: z.string().optional().describe('Additional context, file paths, or relevant information for the agent.')
-        }),
-        execute: async ({ task, context }, { abortSignal, toolCallId }) => {
-            const taskMessage = context ? `Task: ${task}\n\nAdditional Context:\n${context}` : `Task: ${task}`;
-            return executeAgentRun(agentDef, taskMessage, abortSignal, toolCallId);
-        }
-    });
+function getDefaultAgent(): AgentDefinition | undefined {
+    return agentRegistry.get('planner') ?? agentRegistry.getAll()[0];
 }
 
 /**
- * Create tools for ALL registered agents.
- * Each agent becomes a tool named `agent_{id}` — prefix must match AGENT_TOOL_PREFIX in AgentCallPart.tsx.
- * Results are cached and invalidated on reload.
- */
-export function createAgentTools() {
-    if (cachedAgentTools) return cachedAgentTools;
-    const agentTools: Record<string, ReturnType<typeof createAgentTool>> = {};
-    for (const agentDef of agentRegistry.getAll()) {
-        agentTools[`agent_${agentDef.id}`] = createAgentTool(agentDef);
-    }
-    cachedAgentTools = agentTools;
-    return agentTools;
-}
-
-/**
- * Tool that runs multiple sub-agents in parallel and collects results.
+ * Create a unified Agent tool — single tool with subagent_type parameter.
+ * Replaces the per-agent tools (agent_{id}), parallel tool, and handoff tool.
  * Cached and invalidated on reload.
  */
-export function createParallelAgentTool() {
-    if (cachedParallelTool) return cachedParallelTool;
-    const parallelTool = tool({
+export function createUnifiedAgentTool() {
+    if (cachedUnifiedTool) return cachedUnifiedTool;
+
+    const agentSummaries = agentRegistry
+        .getAll()
+        .map((a) => `- ${a.id}: ${a.description}`)
+        .join('\n');
+
+    const unifiedTool = tool({
         description:
-            'Run multiple specialized agents in parallel to work on different subtasks simultaneously. ' +
-            'Use this when a task can be decomposed into independent parts that do not depend on each other. ' +
-            'Each agent gets its own task and runs concurrently. Results are collected and returned together.\n\n' +
+            'Launch a specialized sub-agent to perform a task. ' +
+            'Each sub-agent has its own system prompt, tools, and model. ' +
+            'Use subagent_type to select a specific agent, or omit it to use the default.\n\n' +
             'Available agents:\n' +
-            agentRegistry
-                .getAll()
-                .map((a) => `- ${a.id}: ${a.description}`)
-                .join('\n'),
+            agentSummaries,
         inputSchema: z.object({
-            tasks: z
-                .array(
-                    z.object({
-                        agentId: z.string().describe('The ID of the agent to use'),
-                        task: z.string().describe('The specific task for this agent'),
-                        context: z.string().optional().describe('Additional context for this agent')
-                    })
-                )
-                .min(1)
-                .max(5)
-                .describe('List of tasks to run in parallel (max 5). Each task specifies an agent and what to do.')
+            prompt: z.string().describe('The task for the agent to perform. Be specific and provide all necessary context.'),
+            subagent_type: z
+                .string()
+                .optional()
+                .describe(
+                    'The type of specialized agent to use. Available: ' +
+                        agentRegistry
+                            .getAll()
+                            .map((a) => a.id)
+                            .join(', ') +
+                        '. If omitted, uses the default agent.'
+                ),
+            model: z.string().optional().describe("Optional model override in 'Provider/Model' format. If omitted, uses the agent definition's model or the global active model."),
+            description: z.string().optional().describe('A short (3-5 word) description of the task for display.'),
+            run_in_background: z.boolean().optional().describe('Set to true to run this agent in the background. You will be notified when it completes.')
         }),
-        execute: async ({ tasks }, { abortSignal, toolCallId: parentToolCallId }) => {
-            // Validate all agent IDs
-            for (const t of tasks) {
-                if (!agentRegistry.get(t.agentId)) {
+        execute: async ({ prompt, subagent_type, model: modelOverride, description: _description, run_in_background }, { abortSignal, toolCallId }) => {
+            // Resolve agent definition
+            let agentDef: AgentDefinition | undefined;
+            if (subagent_type) {
+                agentDef = agentRegistry.get(subagent_type);
+                if (!agentDef) {
                     throw new Error(
-                        `Unknown agent: ${t.agentId}. Available agents: ${agentRegistry
+                        `Unknown agent: ${subagent_type}. Available: ${agentRegistry
                             .getAll()
                             .map((a) => a.id)
                             .join(', ')}`
                     );
                 }
+            } else {
+                agentDef = getDefaultAgent();
+                if (!agentDef) {
+                    throw new Error('No agents registered. Use /reload to reload agents.');
+                }
             }
 
-            const results = await Promise.allSettled(
-                tasks.map(async (t, index) => {
-                    const agentDef = agentRegistry.get(t.agentId)!;
-                    const taskMessage = t.context ? `Task: ${t.task}\n\nAdditional Context:\n${t.context}` : `Task: ${t.task}`;
-                    const compositeKey = parentToolCallId ? `${parentToolCallId}_${t.agentId}_${index}` : undefined;
-                    const result = await executeAgentRun(agentDef, taskMessage, abortSignal, compositeKey);
-                    return {
-                        agentId: t.agentId,
-                        task: t.task,
-                        result: JSON.parse(result)
-                    };
-                })
-            );
-
-            const output = results.map((r, i) => {
-                if (r.status === 'fulfilled') return r.value;
-                return {
-                    agentId: tasks[i]!.agentId,
-                    task: tasks[i]!.task,
-                    error: r.reason instanceof Error ? r.reason.message : String(r.reason)
-                };
-            });
-
-            return JSON.stringify(output, null, 2);
-        }
-    });
-    cachedParallelTool = parallelTool;
-    return parallelTool;
-}
-
-/**
- * Tool that allows the current agent to hand off control to another agent.
- * The target agent receives the handoff message and runs to completion.
- */
-export function createHandoffTool(currentAgentId?: string) {
-    if (!currentAgentId && cachedHandoffTool) return cachedHandoffTool;
-    const handoffTool = tool({
-        description:
-            'Transfer control to another specialized agent. The target agent will receive the message and continue the task. ' +
-            'Use this for sequential workflows where one agent needs to hand off to another (e.g., planner → executor).\n\n' +
-            'Available agents:\n' +
-            agentRegistry
-                .getAll()
-                .filter((a) => a.id !== currentAgentId)
-                .map((a) => `- ${a.id}: ${a.description}`)
-                .join('\n'),
-        inputSchema: z.object({
-            agentId: z.string().describe('The ID of the agent to hand off to'),
-            message: z.string().describe('The message or instructions to pass to the target agent. Include any context from the current conversation that the next agent needs.'),
-            context: z.string().optional().describe('Additional structured context (e.g., file paths, findings so far)')
-        }),
-        execute: async ({ agentId, message, context }, { abortSignal, toolCallId }) => {
-            const agentDef = agentRegistry.get(agentId);
-            if (!agentDef) {
-                throw new Error(
-                    `Unknown agent: ${agentId}. Available: ${agentRegistry
-                        .getAll()
-                        .map((a) => a.id)
-                        .join(', ')}`
-                );
+            // Apply model override if specified
+            if (modelOverride) {
+                agentDef = { ...agentDef, model: modelOverride };
             }
 
-            const handoffMessage = context ? `${message}\n\n---\nContext:\n${context}` : message;
-            return executeAgentRun(agentDef, handoffMessage, abortSignal, toolCallId);
+            // Background execution
+            if (run_in_background) {
+                const taskId = uid();
+                registerBackgroundTask({
+                    id: taskId,
+                    agentId: agentDef.id,
+                    description: _description ?? prompt.slice(0, 60),
+                    status: 'running',
+                    startedAt: Date.now()
+                });
+
+                // Fire and forget — the task runs in the background
+                void (async () => {
+                    try {
+                        const result = await executeAgentRun(agentDef!, prompt, abortSignal, toolCallId);
+                        updateBackgroundTask(taskId, {
+                            status: 'completed',
+                            result: result.result,
+                            completedAt: Date.now()
+                        });
+                    } catch (error) {
+                        updateBackgroundTask(taskId, {
+                            status: 'failed',
+                            error: error instanceof Error ? error.message : String(error),
+                            completedAt: Date.now()
+                        });
+                    }
+                })();
+
+                return JSON.stringify({
+                    agent: agentDef.name,
+                    background: true,
+                    taskId,
+                    message: `Background task ${taskId} started for agent '${agentDef.id}'.`
+                });
+            }
+
+            // Synchronous execution
+            const result = await executeAgentRun(agentDef, prompt, abortSignal, toolCallId);
+            return stringifyAgentResult(result);
         }
     });
-    if (!currentAgentId) cachedHandoffTool = handoffTool;
-    return handoffTool;
+
+    cachedUnifiedTool = unifiedTool;
+    return unifiedTool;
 }

@@ -78,6 +78,9 @@ importers:
 
   packages/channels:
     dependencies:
+      '@oagent/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       ai:
         specifier: ^6.0.195
         version: 6.0.195(zod@4.4.3)

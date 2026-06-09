@@ -33,15 +33,18 @@ function MaydayBalls() {
 interface HeaderProps {
     status: ChatStatus;
     pendingApproval: boolean;
+    subAgentName?: string | null;
 }
 
-export function Header({ status, pendingApproval }: HeaderProps) {
+export function Header({ status, pendingApproval, subAgentName }: HeaderProps) {
     const { themeName } = useTheme();
     const runState = pendingApproval
         ? { text: t('status.header.awaitingApproval'), icon: 'warning' as const }
         : status === 'streaming'
           ? { text: t('status.header.streaming'), icon: 'loading' as const }
-          : { text: t('status.header.idle'), icon: 'info' as const };
+          : subAgentName
+            ? { text: t('status.header.subAgentRunning', { name: subAgentName }), icon: 'loading' as const }
+            : { text: t('status.header.idle'), icon: 'info' as const };
 
     return (
         <Box flexDirection="column">

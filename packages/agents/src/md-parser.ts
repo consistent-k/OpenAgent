@@ -88,6 +88,12 @@ function parseSingleAgent(section: AgentSection): AgentDefinition | null {
                   .map((s) => s.trim())
                   .filter(Boolean)
             : undefined,
+        disallowedTools: props.disallowedTools
+            ? props.disallowedTools
+                  .split(',')
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+            : undefined,
         model: props.model ?? undefined,
         maxSteps: props.maxSteps ? Number.parseInt(props.maxSteps, 10) : undefined,
         maxRetries: props.maxRetries ? Number.parseInt(props.maxRetries, 10) : undefined,

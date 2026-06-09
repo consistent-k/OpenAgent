@@ -20,9 +20,11 @@ export function redactToken(token: string | undefined, prefixLen = DEFAULT_TOKEN
 }
 
 /** 脱敏请求体中的敏感字段 */
+const SENSITIVE_FIELD_RE = /"(context_token|bot_token|token|authorization|Authorization)"\s*:\s*"[^"]*"/g;
+
 export function redactBody(body: string | undefined, maxLen = DEFAULT_BODY_MAX_LEN): string {
     if (!body) return '(empty)';
-    const redacted = body.replace(/"(context_token|bot_token|token|authorization|Authorization)"\s*:\s*"[^"]*"/g, '"$1":"<redacted>"');
+    const redacted = body.replace(SENSITIVE_FIELD_RE, '"$1":"<redacted>"');
     if (redacted.length <= maxLen) return redacted;
     return `${redacted.slice(0, maxLen)}…(truncated, totalLen=${redacted.length})`;
 }

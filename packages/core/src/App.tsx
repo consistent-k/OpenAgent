@@ -1,7 +1,8 @@
+import { agentRegistry, type AgentEventEmitter } from '@oagent/agents';
 import { t } from '@oagent/i18n';
 import { Box, useApp, useInput } from 'ink';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { findCommand, COMMANDS, parseCommandInput } from './commands';
+import { findCommand, COMMANDS, parseCommandInput, getAgentCommands } from './commands';
 import {
     getConfigSummary,
     saveConfig,
@@ -18,6 +19,7 @@ import {
     getActiveProviderName,
     type ProviderConfig
 } from './config';
+import { ensureAgentsLoaded, executeAgentRun } from './engine';
 import { useChatStream } from './hooks/useChatStream';
 import { useFileIndex } from './hooks/useFileIndex';
 import { useLocaleSetup } from './hooks/useLocaleSetup';
@@ -62,6 +64,7 @@ function AppContent() {
         denyPendingTool,
         selectQuestionOption,
         appendMessages,
+        updateMessageText,
         setSession,
         reset,
         cancel
@@ -75,6 +78,10 @@ function AppContent() {
     const [showToolDetails, setShowToolDetails] = useState(false);
     const [overlay, setOverlay] = useState<OverlayState>(null);
     const [providerList, setProviderList] = useState<ProviderConfig[]>([]);
+    const [agentCommands, setAgentCommands] = useState<ReturnType<typeof getAgentCommands>>([]);
+    const [subAgentName, setSubAgentName] = useState<string | null>(null);
+    const streamingMsgIdRef = useRef<string | null>(null);
+    const streamingTextRef = useRef('');
 
     // 当 pendingApproval 变化时，同步到 overlay 状态（优先级最高）
     useEffect(() => {
@@ -95,6 +102,13 @@ function AppContent() {
     }, []);
 
     useLocaleSetup();
+
+    // 启动时加载 agent 定义，生成动态 agent 命令供 CommandPalette 使用
+    useEffect(() => {
+        ensureAgentsLoaded()
+            .then(() => setAgentCommands(getAgentCommands()))
+            .catch(() => {});
+    }, []);
 
     // 启动时检查配置，未完善则引导用户
     const configChecked = useRef(false);
@@ -305,11 +319,23 @@ function AppContent() {
         setOverlay(null);
     }, []);
 
+    /** 直接执行子代理（供 agent slash 命令调用） */
+    const executeAgent = useCallback(async (agentId: string, task: string, emitter?: AgentEventEmitter | null): Promise<string> => {
+        await ensureAgentsLoaded();
+        const agentDef = agentRegistry.get(agentId);
+        if (!agentDef) {
+            throw new Error(t('command.agent.notFound', { id: agentId }));
+        }
+        const result = await executeAgentRun(agentDef, task, undefined, undefined, emitter);
+        return result.result;
+    }, []);
+
     const lastIdx = displayMessages.length - 1;
     const lastMessage = lastIdx >= 0 ? displayMessages[lastIdx] : null;
     const isStreaming = status === 'streaming' && lastMessage?.role === 'assistant';
     const historyMessages = isStreaming ? displayMessages.slice(0, -1) : displayMessages;
     const streamingMessage = isStreaming ? lastMessage : null;
+    // 子代理通过 executeAgentRun 直接调用 streamText，不经过 useChat
     const disabled = status === 'streaming';
     const mode = getMode(overlay, disabled, inputValue);
 
@@ -413,7 +439,7 @@ function AppContent() {
                         resetSession: reset,
                         reloadFileIndex,
                         exit,
-                        listCommands: () => COMMANDS,
+                        listCommands: () => [...COMMANDS, ...agentCommands],
                         showSessionPicker: (sessions) => setOverlay(sessions ? { type: 'session', data: sessions } : null),
                         themeName,
                         setThemeName: (name) => setThemeName(name),
@@ -424,6 +450,26 @@ function AppContent() {
                         showProviderPicker: () => {
                             refreshProviderList();
                             setOverlay({ type: 'provider' });
+                        },
+                        executeAgent,
+                        startStreaming: (messageId) => {
+                            streamingMsgIdRef.current = messageId;
+                            streamingTextRef.current = '';
+                            appendMessages([{ id: messageId, role: 'assistant', parts: [{ type: 'text', text: '', state: 'streaming' }] }]);
+                        },
+                        streamText: (text) => {
+                            streamingTextRef.current += text;
+                            if (streamingMsgIdRef.current) {
+                                updateMessageText(streamingMsgIdRef.current, streamingTextRef.current, 'streaming');
+                            }
+                        },
+                        endStreaming: (messageId, finalText) => {
+                            updateMessageText(messageId, finalText, 'done');
+                            streamingMsgIdRef.current = null;
+                            streamingTextRef.current = '';
+                        },
+                        setSubAgentRunning: (name) => {
+                            setSubAgentName(name);
                         }
                     });
                 } catch (error) {
@@ -457,13 +503,15 @@ function AppContent() {
             setThemeName,
             getConfigItems,
             refreshProviderList,
-            setOverlay
+            setOverlay,
+            executeAgent,
+            updateMessageText
         ]
     );
 
     return (
         <Box flexDirection="column">
-            <Header status={status} pendingApproval={pendingApproval !== null} />
+            <Header status={status} pendingApproval={pendingApproval !== null} subAgentName={subAgentName} />
             {historyMessages.length > 0 && <MessageList messages={historyMessages} showReasoning={showReasoning} showToolDetails={showToolDetails} />}
             {streamingMessage && (
                 <Box flexDirection="column" paddingX={1}>
@@ -475,7 +523,7 @@ function AppContent() {
                 </Box>
             )}
             <Tips tip={tip} />
-            <Input value={inputValue} onChange={setInputValue} onSubmit={handleSubmit} disabled={disabled} fileIndex={fileIndex} mode={mode}>
+            <Input value={inputValue} onChange={setInputValue} onSubmit={handleSubmit} disabled={disabled} fileIndex={fileIndex} mode={mode} agentCommands={agentCommands}>
                 {overlay?.type === 'approval' && pendingApproval && (
                     <ApprovalDialog
                         pending={pendingApproval}

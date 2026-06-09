@@ -5,6 +5,7 @@ import { CONFIG_PATH, getConfigSummary } from '@/config';
 
 // Read AGENTS.md file content (backward compatible — non-agent parts only)
 let agentsContextCache: string | null = null;
+let subAgentPromptCache: string | null = null;
 
 function getAgentsContext(): string {
     if (agentsContextCache !== null) return agentsContextCache;
@@ -32,6 +33,7 @@ function getAgentsContext(): string {
  * This tells the main agent what sub-agents are available and when to use them.
  */
 function getSubAgentPromptSection(): string {
+    if (subAgentPromptCache !== null) return subAgentPromptCache;
     const agents = agentRegistry.getAll();
     if (agents.length === 0) return '';
 
@@ -39,30 +41,33 @@ function getSubAgentPromptSection(): string {
         .map((a) => {
             const toolList = a.allowedTools ? `Tools: ${a.allowedTools.join(', ')}` : 'Tools: all available tools';
             const model = a.model ? `Model: ${a.model}` : '';
-            return [`### agent_${a.id}`, a.description, toolList, model].filter(Boolean).join('\n');
+            return [`### ${a.id}`, `Name: ${a.name}`, a.description, toolList, model].filter(Boolean).join('\n');
         })
         .join('\n\n');
 
-    return `
+    subAgentPromptCache = `
 
 ## Sub-Agents (Delegatable Tasks)
 
-You have access to specialized sub-agents that you can delegate tasks to. Each sub-agent has its own system prompt and tool set.
+You have access to specialized sub-agents that you can delegate tasks to via the \`agent\` tool. Each sub-agent has its own system prompt, tools, and model.
 
 **Available sub-agents:**
 
 ${agentDescriptions}
 
-**How to use sub-agents:**
-- **Agent-as-Tool**: Call \`agent_<id>\` with a specific task. The sub-agent runs to completion and returns the result. Use this for focused, self-contained subtasks.
-- **Parallel execution**: Call \`run_agents_parallel\` with multiple tasks to run several sub-agents concurrently. Use this when you have independent subtasks that don't depend on each other.
-- **Handoff**: Call \`agent_handoff\` to transfer control to another agent for sequential workflows (e.g., planning → execution → review).
+**How to use the agent tool:**
+- Call the \`agent\` tool with a \`prompt\` describing the task.
+- Use \`subagent_type\` to select a specific agent by ID (e.g., "researcher", "code-reviewer").
+- If \`subagent_type\` is omitted, a default agent is used.
+- Set \`run_in_background: true\` for long-running tasks — the agent will run in the background and you will be notified when it completes.
+- You can optionally specify \`model\` to override the agent's default model, and \`description\` for display.
 
 **When to delegate:**
 - The task matches a sub-agent's specialty
 - The task is self-contained enough to describe in a single prompt
-- Parallelism would speed up the work
-- You need a different model or tool set for a specific subtask`;
+- You need a different model or tool set for a specific subtask
+- You want to run a task in the background while continuing other work`;
+    return subAgentPromptCache;
 }
 
 export function getSystemPrompt(): string {
@@ -104,7 +109,8 @@ You are a pragmatic, efficient assistant focused on helping users solve real pro
 ${getSubAgentPromptSection()}${getAgentsContext()}`;
 }
 
-/** Reset the AGENTS.md cache (called on /reload) */
+/** Reset the AGENTS.md and sub-agent prompt cache (called on /reload) */
 export function resetSystemPromptCache(): void {
     agentsContextCache = null;
+    subAgentPromptCache = null;
 }

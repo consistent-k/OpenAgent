@@ -2,6 +2,7 @@ import os from 'node:os';
 import { t } from '@oagent/i18n';
 import { Box, Text } from 'ink';
 import React, { useEffect, useState } from 'react';
+import { getModelContextWindow } from '../../config';
 import type { UsageInfo } from '../../hooks/useChatStream';
 import { getBranch } from '../../utils/sessions';
 import { useTheme } from '../text/theme';
@@ -40,7 +41,8 @@ export function StatusBar({ cwd, modelId, usage }: StatusBarProps) {
     }, []);
 
     const displayPath = cwd.replace(os.homedir(), '~');
-    const maxTokens = CONTEXT_WINDOWS.find(([prefix]) => modelId.startsWith(prefix))?.[1] ?? DEFAULT_CONTEXT_WINDOW;
+    // 优先从供应商配置读取，fallback 到前缀匹配表
+    const maxTokens = getModelContextWindow(modelId) ?? CONTEXT_WINDOWS.find(([prefix]) => modelId.startsWith(prefix))?.[1] ?? DEFAULT_CONTEXT_WINDOW;
 
     const total = usage?.totalTokens ?? 0;
     const pct = maxTokens > 0 ? (total / maxTokens) * 100 : 0;

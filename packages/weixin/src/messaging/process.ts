@@ -27,7 +27,7 @@ export async function processMessage(params: ProcessMessageParams): Promise<void
     const { userId, text, sessionManager, baseUrl, token, contextToken, abortSignal, onMessage, runAgent } = params;
 
     const transport: MessageTransport = {
-        sendText: (uid, msg) => sendMessageWeixin({ to: uid, text: msg, opts: { baseUrl, token, contextToken, skipFilter: true } }).then(),
+        sendText: (uid, msg) => sendMessageWeixin({ to: uid, text: msg, opts: { baseUrl, token, contextToken, skipFilter: true } }).then(() => {}),
         sendNotification: (uid, msg) => {
             void sendMessageWeixin({ to: uid, text: msg, opts: { baseUrl, token, contextToken, skipFilter: true } }).catch((err) =>
                 logger.error(`Failed to send notification to=${uid}: ${String(err)}`)

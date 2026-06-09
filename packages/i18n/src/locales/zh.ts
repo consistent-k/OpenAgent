@@ -2,10 +2,6 @@
  * 中文翻译（默认语言）
  */
 export const zh: Record<string, string> = {
-    // ── 命令描述 ──
-    'command.help.description': '显示所有可用命令；可用 /help /命令 查看单个命令',
-    'command.help.availableCommands': '可用命令：\n{helpText}',
-
     'command.status.description': '显示当前工作目录、文件索引数量和会话状态',
     'command.status.workingDirectory': '工作目录：{cwd}',
     'command.status.fileIndex': '文件索引：{count} 项',
@@ -93,6 +89,11 @@ export const zh: Record<string, string> = {
     'command.agents.description': '列出可用的子 Agent',
     'command.agents.title': '可用 Agent',
     'command.agents.none': '没有注册的子 Agent。可在 AGENTS.md 或 config.json 中定义。',
+    'command.agents.hint': '💡 可通过 /<agent-id> <任务> 直接调用子 Agent，如：/researcher 分析这段代码',
+
+    'command.agent.noTask': '请提供任务描述。用法：/{id} <任务>',
+    'command.agent.notFound': '未找到子 Agent：{id}',
+    'command.agent.error': '子 Agent 执行出错：{error}',
 
     // ── UI 组件 ──
     'ui.approval.approve': '批准执行',
@@ -192,6 +193,7 @@ export const zh: Record<string, string> = {
     'status.header.awaitingApproval': '等待审批',
     'status.header.streaming': '生成中...',
     'status.header.idle': '空闲',
+    'status.header.subAgentRunning': '子代理运行中：{name}',
     'status.header.modelLabel': '模型：',
 
     'status.bar.inputLabel': '输入：',
@@ -208,6 +210,7 @@ export const zh: Record<string, string> = {
 
     'tool.agent.parallel': '并行执行',
     'tool.agent.handoff': 'Agent 接力',
+    'tool.agent.default': '通用 Agent',
     'tool.agent.preparing': '准备中...',
     'tool.agent.pending': '等待中',
     'tool.agent.running': '运行中',
@@ -235,6 +238,18 @@ export const zh: Record<string, string> = {
     'tool.verb.urls': 'URL',
     'tool.verb.query': '查询',
     'tool.verb.queries': '查询',
+
+    // ── 工具标签（channel 通知用） ──
+    'tool.label.readFile': '阅读文件',
+    'tool.label.writeFile': '写入文件',
+    'tool.label.editFile': '编辑文件',
+    'tool.label.executeBash': '执行命令',
+    'tool.label.grep': '搜索代码',
+    'tool.label.glob': '搜索文件',
+    'tool.label.fetch': '访问网页',
+    'tool.label.readDirectory': '浏览目录',
+    'tool.label.webSearch': '搜索网络',
+    'tool.label.askUserQuestion': '询问用户',
 
     'tool.group.errorCount': '({count} 个错误)',
     'tool.group.expandHint': '（Ctrl+O 展开）',
@@ -272,6 +287,11 @@ export const zh: Record<string, string> = {
     'tool.webSearch.parseError': '无法解析搜索 API 响应格式',
     'tool.webSearch.noResults': '未找到结果',
     'tool.webSearch.searchFailed': '搜索失败：{error}',
+
+    // ── Channel 通知 ──
+    'channel.error.processFailed': '处理出错',
+    'channel.notify.usingTool': '🔧 正在使用工具: {tool}...',
+    'channel.notify.thinking': '🤔 正在思考...',
 
     // ── 错误消息 ──
     'error.configNotReady': '⚠️ 配置未完善，请先输入 /config 配置 baseUrl、apiKey、model',

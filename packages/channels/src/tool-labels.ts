@@ -1,20 +1,22 @@
 /**
- * 工具名称 → 中文标签映射（共享）
+ * 工具名称 → 本地化标签映射（通过 i18n）
  */
+import { t } from '@oagent/i18n';
 
-const TOOL_LABELS: Record<string, string> = {
-    read_file: '阅读文件',
-    write_file: '写入文件',
-    edit_file: '编辑文件',
-    execute_bash: '执行命令',
-    grep: '搜索代码',
-    glob: '搜索文件',
-    fetch: '访问网页',
-    read_directory: '浏览目录',
-    web_search: '搜索网络',
-    ask_user_question: '询问用户'
+const TOOL_LABEL_KEYS: Record<string, string> = {
+    read_file: 'tool.label.readFile',
+    write_file: 'tool.label.writeFile',
+    edit_file: 'tool.label.editFile',
+    execute_bash: 'tool.label.executeBash',
+    grep: 'tool.label.grep',
+    glob: 'tool.label.glob',
+    fetch: 'tool.label.fetch',
+    read_directory: 'tool.label.readDirectory',
+    web_search: 'tool.label.webSearch',
+    ask_user_question: 'tool.label.askUserQuestion'
 };
 
 export function getToolLabel(toolName: string): string {
-    return TOOL_LABELS[toolName] || toolName;
+    const key = TOOL_LABEL_KEYS[toolName];
+    return key ? t(key) : toolName;
 }

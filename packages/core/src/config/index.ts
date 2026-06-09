@@ -27,6 +27,8 @@ export interface ProviderConfig {
     apiKey: string;
     /** 该供应商下的可用模型列表 */
     models: string[];
+    /** 模型上下文窗口大小映射（可选），如 { "gpt-4o": 128000 } */
+    contextWindows?: Record<string, number>;
 }
 
 /** 用户自定义 Agent 配置（config.json 中的 agents 字段） */
@@ -41,6 +43,8 @@ export interface UserAgentConfig {
     systemPrompt: string;
     /** 允许的工具名列表，省略则允许所有工具 */
     allowedTools?: string[];
+    /** 拒绝的工具名列表（优先于 allowedTools） */
+    disallowedTools?: string[];
     /** 模型覆盖，格式 "Provider/Model" */
     model?: string;
     /** 步数覆盖 */
@@ -339,6 +343,19 @@ export function getConfiguredAgents(): UserAgentConfig[] {
 /** 获取配置的 Agent 插件包名列表 */
 export function getConfiguredAgentPlugins(): string[] {
     return readConfig().agentPlugins ?? [];
+}
+
+/** 获取模型的上下文窗口大小（从供应商配置中读取） */
+export function getModelContextWindow(modelId: string): number | undefined {
+    const providers = readConfig().providers ?? [];
+    for (const p of providers) {
+        if (p.contextWindows) {
+            // modelId 格式: "ProviderName/ModelName"，需要匹配 ModelName 部分
+            const modelName = modelId.includes('/') ? modelId.slice(modelId.indexOf('/') + 1) : modelId;
+            if (modelName in p.contextWindows) return p.contextWindows[modelName];
+        }
+    }
+    return undefined;
 }
 
 /** 获取单个供应商 */

@@ -4,17 +4,13 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Dialog } from '@/ui/text/Dialog';
 import { ListItem } from '@/ui/text/ListItem';
 import { formatSessionTime, type SessionSummary } from '@/utils/sessions';
+import { truncate } from '@/utils/truncate';
 
 interface Props {
     sessions: SessionSummary[];
     onSelect: (sessionId: string) => void;
     onCancel: () => void;
     onDelete?: (sessionId: string) => void;
-}
-
-function truncate(text: string, max: number): string {
-    if (text.length <= max) return text;
-    return text.slice(0, max - 1) + '…';
 }
 
 function getDisplayLabel(session: SessionSummary): string {

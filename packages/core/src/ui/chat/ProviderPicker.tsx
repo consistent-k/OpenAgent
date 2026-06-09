@@ -201,8 +201,8 @@ export function ProviderPicker({ providers, activeProviderName, onAdd, onUpdate,
 
     const handleFormSubmit = useCallback(
         (value: string) => {
-            const formSteps = getFormSteps();
             if (formMode === 'add') {
+                const formSteps = getFormSteps();
                 if (formStep < formSteps.length - 1) {
                     const newValues = { ...formValues, [formSteps[formStep]!.key]: value };
                     setFormValues(newValues);
@@ -224,6 +224,7 @@ export function ProviderPicker({ providers, activeProviderName, onAdd, onUpdate,
                 }
             } else {
                 // Edit mode — single field update
+                const formSteps = getFormSteps();
                 const stepKey = formSteps[formStep]!.key;
                 if (selectedProvider) {
                     if (stepKey === 'name') {
@@ -349,7 +350,8 @@ export function ProviderPicker({ providers, activeProviderName, onAdd, onUpdate,
                             apiKey: selectedProvider.apiKey,
                             models: selectedProvider.models.join(', ')
                         });
-                        const stepIdx = getFormSteps().findIndex((s) => s.key === item.key);
+                        const currentFormSteps = getFormSteps();
+                        const stepIdx = currentFormSteps.findIndex((s) => s.key === item.key);
                         setFormStep(stepIdx >= 0 ? stepIdx : 0);
                         setView('form');
                     }

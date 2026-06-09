@@ -2,6 +2,7 @@
  * 通用消息处理流程（共享）
  * 追加到会话 → 调用 AI → 消费流 → 收集回复 → 发送
  */
+import { t } from '@oagent/i18n';
 import type { ModelMessage } from 'ai';
 import type { ChannelLogger } from './logger';
 import type { SessionManager } from './session';
@@ -57,10 +58,10 @@ export async function processMessage(params: ProcessMessageParams): Promise<void
             } else if (chunk.type === 'tool-input-start') {
                 const toolName = chunk.toolName as string;
                 logger.info(`Tool call detected for user=${userId}: ${toolName}`);
-                transport.sendNotification(userId, `🔧 正在使用工具: ${getToolLabel(toolName)}...`);
+                transport.sendNotification(userId, t('channel.notify.usingTool', { tool: getToolLabel(toolName) }));
             } else if (chunk.type === 'reasoning-start') {
                 logger.info(`Reasoning started for user=${userId}`);
-                transport.sendNotification(userId, '🤔 正在思考...');
+                transport.sendNotification(userId, t('channel.notify.thinking'));
             }
         }
         logger.info(`Stream completed for user=${userId}, length=${replyText.length}`);
@@ -93,7 +94,7 @@ export async function processMessage(params: ProcessMessageParams): Promise<void
 
         // 截断过长的错误信息
         const shortMsg = errMsg.length > 200 ? errMsg.slice(0, 200) + '...' : errMsg;
-        const userMsg = `⚠️ 处理出错: ${shortMsg}`;
+        const userMsg = `⚠️ ${t('channel.error.processFailed')}: ${shortMsg}`;
 
         // 发送错误提示
         try {

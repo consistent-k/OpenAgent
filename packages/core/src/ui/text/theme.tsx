@@ -145,11 +145,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const toggleTheme = () =>
-        setThemeNameState((t) => {
-            const idx = themeOrder.indexOf(t);
-            return themeOrder[(idx + 1) % themeOrder.length]!;
+    const toggleTheme = () => {
+        setThemeNameState((prev) => {
+            const next = themeOrder[(themeOrder.indexOf(prev) + 1) % themeOrder.length]!;
+            try {
+                saveConfig({ theme: next });
+            } catch {
+                // 忽略保存失败
+            }
+            return next;
         });
+    };
     const value = useMemo(() => ({ themeName, theme: themes[themeName], toggleTheme, setThemeName }), [themeName]);
     return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

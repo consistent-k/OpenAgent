@@ -9,6 +9,7 @@ import { setRetryCallback, clearRetryCallback, type RetryInfo } from '../engine/
 import { setToolApproval } from '../engine/tools/utils/approval-store';
 import { extractApiErrorMessage } from '../utils/errors';
 import { expandMentions, type FileEntry } from '../utils/files';
+import { isTerminalToolState } from '../utils/tool-state';
 import { uid } from '../utils/uid';
 
 /** 统一的提示状态 */
@@ -49,6 +50,8 @@ interface UseChatStreamResult {
     denyPendingTool: (reason?: string) => Promise<void>;
     selectQuestionOption: (optionText: string) => Promise<void>;
     appendMessages: (items: UIMessage[]) => void;
+    /** 更新指定消息的文本内容（用于子代理流式输出） */
+    updateMessageText: (messageId: string, text: string, state?: 'streaming' | 'done') => void;
     setSession: (displayMessages: UIMessage[]) => void;
     reset: () => void;
     cancel: () => void;
@@ -92,11 +95,6 @@ function findPendingApproval(messages: UIMessage[]): PendingToolApproval | null 
     return null;
 }
 
-/** 终态判断（与 AgentCallPart.tsx、ToolCallPart.tsx 保持一致） */
-function isTerminalToolState(state: string): boolean {
-    return state === 'output-available' || state === 'output-error' || state === 'output-denied';
-}
-
 /**
  * 扫描最后一条 assistant 消息的工具状态，返回 { hasActive, allFinished }。
  * hasActive: 是否有正在执行的工具（非终态）
@@ -121,7 +119,15 @@ function getToolExecutionStatus(messages: UIMessage[]): { hasActive: boolean; al
     return { hasActive: false, allFinished: false };
 }
 
+/**
+ * 用户主动取消后置 true，阻止 shouldSendAutomatically 再次触发发送。
+ * 模块级 ref：useChat 的 sendAutomaticallyWhen 只接受静态谓词，不支持 ref 读取，
+ * 因此必须在 predicate 函数体外维护状态。当前仅单一 hook 实例，无跨实例泄漏风险。
+ */
+const stoppedByUserRef = { current: false };
+
 function shouldSendAutomatically({ messages }: { messages: UIMessage[] }) {
+    if (stoppedByUserRef.current) return false;
     return lastAssistantMessageIsCompleteWithToolCalls({ messages }) || lastAssistantMessageIsCompleteWithApprovalResponses({ messages }) || getToolExecutionStatus(messages).allFinished;
 }
 
@@ -132,14 +138,24 @@ function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableSt
     const origError = console.error;
     let errorSuppressed = false;
 
+    const suppressErrors = () => {
+        if (!errorSuppressed) {
+            console.error = () => {};
+            errorSuppressed = true;
+        }
+    };
+
+    const restoreErrors = () => {
+        if (errorSuppressed) {
+            console.error = origError;
+            errorSuppressed = false;
+        }
+    };
+
     return stream.pipeThrough(
         new TransformStream<UIMessageChunk, UIMessageChunk>({
             transform(chunk, controller) {
-                // 抑制 AI SDK 内部的 console.error
-                if (!errorSuppressed) {
-                    console.error = () => {};
-                    errorSuppressed = true;
-                }
+                suppressErrors();
 
                 if (chunk.type === 'tool-input-start') {
                     pending.set(chunk.toolCallId, { toolName: chunk.toolName, input: '', dynamic: chunk.dynamic });
@@ -168,27 +184,22 @@ function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableSt
                 controller.enqueue(chunk);
             },
             flush(controller) {
-                const baseMsg = streamError ? `${t('error.streamInterrupted')} — ${streamError}` : t('error.streamInterrupted');
-                for (const [toolCallId, info] of pending) {
-                    controller.enqueue({
-                        type: 'tool-output-error',
-                        toolCallId,
-                        errorText: baseMsg,
-                        dynamic: info.dynamic
-                    } as UIMessageChunk);
-                }
-                // 确保始终恢复 console.error
-                if (errorSuppressed) {
-                    console.error = origError;
-                    errorSuppressed = false;
+                try {
+                    const baseMsg = streamError ? `${t('error.streamInterrupted')} — ${streamError}` : t('error.streamInterrupted');
+                    for (const [toolCallId, info] of pending) {
+                        controller.enqueue({
+                            type: 'tool-output-error',
+                            toolCallId,
+                            errorText: baseMsg,
+                            dynamic: info.dynamic
+                        } as UIMessageChunk);
+                    }
+                } finally {
+                    restoreErrors();
                 }
             },
             cancel() {
-                // 流被取消时也要恢复 console.error
-                if (errorSuppressed) {
-                    console.error = origError;
-                    errorSuppressed = false;
-                }
+                restoreErrors();
             }
         })
     );
@@ -290,6 +301,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
 
     const send = useCallback(
         async (text: string) => {
+            stoppedByUserRef.current = false;
             if (!isConfigReady()) {
                 setMessages((prev) => [
                     ...prev,
@@ -369,6 +381,21 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
         [setMessages]
     );
 
+    const updateMessageText = useCallback(
+        (messageId: string, text: string, state: 'streaming' | 'done' = 'done') => {
+            setMessages((prev) =>
+                prev.map((msg) => {
+                    if (msg.id !== messageId) return msg;
+                    return {
+                        ...msg,
+                        parts: msg.parts.map((part) => (part.type === 'text' ? { ...part, text, state } : part))
+                    };
+                })
+            );
+        },
+        [setMessages]
+    );
+
     const setSessionFn = useCallback(
         (displayMessages: UIMessage[]) => {
             setMessages(displayMessages);
@@ -383,6 +410,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
     }, [stop, setMessages]);
 
     const cancel = useCallback(() => {
+        stoppedByUserRef.current = true;
         abortAll();
         stop();
     }, [stop]);
@@ -401,6 +429,7 @@ export function useChatStream({ fileIndex, cwd }: UseChatStreamOptions): UseChat
         denyPendingTool,
         selectQuestionOption,
         appendMessages,
+        updateMessageText,
         setSession: setSessionFn,
         reset,
         cancel

@@ -1,6 +1,7 @@
 import type { TextUIPart, UIMessage } from 'ai';
 import { Box } from 'ink';
 import React from 'react';
+import { isTerminalToolState } from '../../utils/tool-state';
 import { Divider } from '../text/Divider';
 import { groupParts } from './groupToolParts';
 import { ToolCallGroup } from './ToolCallGroup';
@@ -25,7 +26,7 @@ export const MessageList = React.memo(function MessageList({ messages, showReaso
                         <Box flexDirection="column" marginBottom={1}>
                             {groupParts(msg.parts).map((group) => {
                                 if (group.type === 'tool-group') {
-                                    const allTerminal = group.parts.every((p) => p.state === 'output-available' || p.state === 'output-error' || p.state === 'output-denied');
+                                    const allTerminal = group.parts.every((p) => isTerminalToolState(p.state));
                                     return <ToolCallGroup key={`${msg.id}-tg-${group.startIndex}`} parts={group.parts} expanded={!allTerminal || showToolDetails} />;
                                 }
                                 return <PartRenderer key={`${msg.id}-${group.startIndex}`} part={group.part} partIndex={group.startIndex} messageId={msg.id} showReasoning={showReasoning} />;

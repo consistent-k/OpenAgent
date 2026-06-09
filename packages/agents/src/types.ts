@@ -16,6 +16,8 @@ export interface AgentDefinition {
     systemPrompt: string;
     /** Tool names this agent is allowed to use. undefined = all tools */
     allowedTools?: string[];
+    /** Tool names this agent is NOT allowed to use (denylist). Takes precedence over allowedTools */
+    disallowedTools?: string[];
     /** Model override in "Provider/Model" format. undefined = global active model */
     model?: string;
     /** Max steps override. undefined = global maxSteps */
