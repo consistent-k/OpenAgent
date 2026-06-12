@@ -19,20 +19,34 @@ interface ApprovalPreferences {
 export class ApprovalStore {
     private path: string;
     private cached: ApprovalPreferences | null = null;
+    private cacheTimestamp = 0;
+    private readonly CACHE_TTL_MS = 5000; // 缓存 5 秒后失效
 
     constructor(filePath?: string) {
         this.path = filePath ?? DEFAULT_APPROVALS_PATH;
     }
 
     private readPreferences(): ApprovalPreferences {
-        if (this.cached) return this.cached;
+        const now = Date.now();
+        // 缓存过期后重新读取
+        if (this.cached && now - this.cacheTimestamp < this.CACHE_TTL_MS) {
+            return this.cached;
+        }
         this.cached = readJsonFile<ApprovalPreferences>(this.path) ?? {};
+        this.cacheTimestamp = now;
         return this.cached;
     }
 
     private writePreferences(prefs: ApprovalPreferences): void {
         writeJsonFile(this.path, prefs);
         this.cached = prefs;
+        this.cacheTimestamp = Date.now();
+    }
+
+    /** 使缓存失效（用于外部修改配置文件后） */
+    invalidateCache(): void {
+        this.cached = null;
+        this.cacheTimestamp = 0;
     }
 
     isToolApproved(toolName: string): boolean {

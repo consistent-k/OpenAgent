@@ -17,26 +17,75 @@ export type ProcessMessageParams = {
     runAgent: RunAgentFn;
 };
 
+/** 将 Markdown 转换为 Telegram HTML 格式 */
+function markdownToTelegramHtml(md: string): string {
+    let html = md
+        // 代码块（必须在行内样式之前处理）
+        .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+        // 行内代码
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        // 粗体
+        .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+        // 斜体
+        .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<i>$1</i>')
+        // 删除线
+        .replace(/~~([^~]+)~~/g, '<s>$1</s>')
+        // 链接
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+    // 转义 HTML 特殊字符（但保留已插入的标签）
+    // 先保护已插入的标签
+    const tags: string[] = [];
+    html = html.replace(/<\/?[a-z][^>]*>/gi, (tag) => {
+        tags.push(tag);
+        return `\x00${tags.length - 1}\x00`;
+    });
+    // 转义剩余的 HTML 特殊字符
+    html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // 恢复标签
+    html = html.replace(/\x00(\d+)\x00/g, (_, i) => tags[parseInt(i)] ?? '');
+
+    return html;
+}
+
 /** 通过 Telegram Bot API 发送文本消息 */
 async function sendTelegramMessage(client: AxiosInstance, chatId: string, text: string): Promise<void> {
     const MAX_LENGTH = 4096;
+    const htmlText = markdownToTelegramHtml(text);
 
-    if (text.length <= MAX_LENGTH) {
-        await client.post('/sendMessage', {
-            chat_id: chatId,
-            text,
-            parse_mode: 'Markdown'
-        });
+    if (htmlText.length <= MAX_LENGTH) {
+        await client
+            .post('/sendMessage', {
+                chat_id: chatId,
+                text: htmlText,
+                parse_mode: 'HTML'
+            })
+            .catch(async (err) => {
+                // HTML 解析失败时降级为纯文本
+                if (err?.response?.data?.description?.includes("can't parse entities")) {
+                    await client.post('/sendMessage', { chat_id: chatId, text });
+                } else {
+                    throw err;
+                }
+            });
     } else {
-        let remaining = text;
+        let remaining = htmlText;
         while (remaining.length > 0) {
             const chunk = remaining.slice(0, MAX_LENGTH);
             remaining = remaining.slice(MAX_LENGTH);
-            await client.post('/sendMessage', {
-                chat_id: chatId,
-                text: chunk,
-                parse_mode: 'Markdown'
-            });
+            await client
+                .post('/sendMessage', {
+                    chat_id: chatId,
+                    text: chunk,
+                    parse_mode: 'HTML'
+                })
+                .catch(async (err) => {
+                    if (err?.response?.data?.description?.includes("can't parse entities")) {
+                        await client.post('/sendMessage', { chat_id: chatId, text: chunk });
+                    } else {
+                        throw err;
+                    }
+                });
         }
     }
 }

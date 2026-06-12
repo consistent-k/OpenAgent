@@ -146,8 +146,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
 
     const toggleTheme = () => {
+        // 先计算下一个主题，再更新状态和保存配置
+        // 避免在 state updater 函数中执行副作用（React 严格模式下会调用两次）
         setThemeNameState((prev) => {
             const next = themeOrder[(themeOrder.indexOf(prev) + 1) % themeOrder.length]!;
+            // 异步保存配置，不阻塞状态更新
             try {
                 saveConfig({ theme: next });
             } catch {

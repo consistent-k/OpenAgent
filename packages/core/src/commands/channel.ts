@@ -33,10 +33,12 @@ let loadError: string | null = null;
  */
 async function ensurePlugins(): Promise<void> {
     if (pluginsLoaded) return;
-    pluginsLoaded = true;
 
     const channelPkgs = getConfiguredChannels();
-    if (channelPkgs.length === 0) return;
+    if (channelPkgs.length === 0) {
+        pluginsLoaded = true;
+        return;
+    }
 
     for (const pkgName of channelPkgs) {
         try {
@@ -58,6 +60,8 @@ async function ensurePlugins(): Promise<void> {
             loadError = t('command.channel.pluginLoadFailed', { pkgName, err: err instanceof Error ? err.message : String(err) });
         }
     }
+    // 所有插件加载完成（包括失败的），标记为已加载
+    pluginsLoaded = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,10 +125,11 @@ export const channelCommand: SlashCommand = {
                     { id: uid(), role: 'assistant', parts: [{ type: 'text', text: lines.join('\n'), state: 'done' }] }
                 ]);
 
-                // 在 channelStore 上下文中异步启动，工具的 needsApproval 会自动使用此 store
-                withStore(channelStore, () =>
-                    channelManager
-                        .start(target, (event) => {
+                // 异步启动 channel，事件回调中使用 withStore 确保审批上下文正确
+                channelManager
+                    .start(target, (event) => {
+                        // 在事件回调中使用 withStore，确保工具审批使用 channelStore
+                        withStore(channelStore, () => {
                             const prefix = event.type === 'inbound' ? `📩 [${event.channelId}]` : event.type === 'reply' ? `📤 [${event.channelId}]` : `❌ [${event.channelId}]`;
                             appendMessages([
                                 {
@@ -133,26 +138,26 @@ export const channelCommand: SlashCommand = {
                                     parts: [{ type: 'text', text: `${prefix} ${event.userId}\n${event.text}`, state: 'done' }]
                                 }
                             ]);
-                        })
-                        .then(() => {
-                            appendMessages([
-                                {
-                                    id: uid(),
-                                    role: 'assistant',
-                                    parts: [{ type: 'text', text: t('command.channel.stopped', { name: channel.name }), state: 'done' }]
-                                }
-                            ]);
-                        })
-                        .catch((err) => {
-                            appendMessages([
-                                {
-                                    id: uid(),
-                                    role: 'assistant',
-                                    parts: [{ type: 'text', text: t('command.channel.exitedWithError', { name: channel.name, err: String(err) }), state: 'done' }]
-                                }
-                            ]);
-                        })
-                );
+                        });
+                    })
+                    .then(() => {
+                        appendMessages([
+                            {
+                                id: uid(),
+                                role: 'assistant',
+                                parts: [{ type: 'text', text: t('command.channel.stopped', { name: channel.name }), state: 'done' }]
+                            }
+                        ]);
+                    })
+                    .catch((err) => {
+                        appendMessages([
+                            {
+                                id: uid(),
+                                role: 'assistant',
+                                parts: [{ type: 'text', text: t('command.channel.exitedWithError', { name: channel.name, err: String(err) }), state: 'done' }]
+                            }
+                        ]);
+                    });
                 return;
             }
 

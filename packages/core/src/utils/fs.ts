@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import fsAsync from 'node:fs/promises';
+import path from 'node:path';
 
 /** 确保目录存在（同步） */
 export function ensureDirSync(dir: string): void {
@@ -25,6 +26,7 @@ export function readJsonFile<T>(filePath: string): T | null {
 
 /** 写入 JSON 文件，自动创建父目录 */
 export function writeJsonFile(filePath: string, data: unknown, indent = 4): void {
-    ensureDirSync(filePath.substring(0, filePath.lastIndexOf('/')));
+    // 使用 path.dirname 替代手动截取，确保跨平台兼容（Windows 使用 \ 分隔符）
+    ensureDirSync(path.dirname(filePath));
     fs.writeFileSync(filePath, JSON.stringify(data, null, indent), 'utf-8');
 }

@@ -62,6 +62,7 @@ function extractRetryDelayMs(error: APICallError, exponentialBackoffMs: number):
  * 每次重试都会重新进入 wrapStream，因此通过闭包计数器追踪重试次数。
  */
 export function createRetryNotificationMiddleware(maxRetries: number): LanguageModelMiddleware {
+    // 注意：attemptCount 必须在 wrapStream 外部初始化，因为每次重试都会重新调用 wrapStream
     let attemptCount = 0;
     const initialDelayMs = 2000;
     const backoffFactor = 2;
@@ -69,7 +70,8 @@ export function createRetryNotificationMiddleware(maxRetries: number): LanguageM
     return {
         specificationVersion: 'v3',
         async wrapStream({ doStream }) {
-            attemptCount = 0;
+            // 不要在这里重置 attemptCount！
+            // 重试循环在外层，每次重试都会重新进入 wrapStream
             try {
                 return await doStream();
             } catch (error) {

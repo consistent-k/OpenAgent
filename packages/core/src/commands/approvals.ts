@@ -26,7 +26,14 @@ export const approvalsCommand: SlashCommand = {
         }
 
         // /approvals revoke <tool> — 取消某工具的自动批准
-        if (args[0] === 'revoke' && args[1]) {
+        if (args[0] === 'revoke') {
+            if (!args[1]) {
+                appendMessages([
+                    { id: uid(), role: 'user', parts: [{ type: 'text', text: rawInput }] },
+                    { id: uid(), role: 'assistant', parts: [{ type: 'text', text: t('command.approvals.specifyTool'), state: 'done' }] }
+                ]);
+                return;
+            }
             const toolName = args[1];
             if (!APPROVABLE_TOOLS.includes(toolName as (typeof APPROVABLE_TOOLS)[number])) {
                 appendMessages([

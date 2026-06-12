@@ -69,6 +69,11 @@ export function t(key: string, vars?: Record<string, string | number>): string {
     const en = localeMap.get('en');
     const zh = localeMap.get('zh');
     const template = current?.translations[key] ?? en?.translations[key] ?? zh?.translations[key] ?? key;
+
     if (!vars) return template;
-    return Object.entries(vars).reduce((result, [k, v]) => result.replaceAll(`{${k}}`, String(v)), template);
+    // 使用一次性替换避免级联替换问题（如 {a: '{b}', b: 'hello' } 不会互相影响）
+    return template.replace(/\{(\w+)\}/g, (match, varName: string) => {
+        const value = vars[varName];
+        return value !== undefined ? String(value) : match;
+    });
 }

@@ -38,8 +38,15 @@ export function resolveSafePath(relPath: string): string {
 }
 
 /**
- * 读操作路径解析：不做工作目录限制，绝对路径直接使用，相对路径基于 ROOT_DIR 解析。
+ * 读操作路径解析：相对路径基于 ROOT_DIR 解析，绝对路径限制在 ROOT_DIR 内。
+ * 防止路径遍历攻击（如 /etc/passwd 或 ../../etc/passwd）。
  */
 export function resolveReadPath(filePath: string): string {
-    return path.resolve(ROOT_DIR, filePath);
+    const resolved = path.resolve(ROOT_DIR, filePath);
+    const relative = path.relative(ROOT_DIR, resolved);
+    // 拒绝任何超出 ROOT_DIR 的路径（包括绝对路径和 .. 遍历）
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        throw new Error(t('error.safePath.outOfBounds'));
+    }
+    return resolved;
 }

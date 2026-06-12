@@ -11,7 +11,8 @@ export interface FileEntry {
 
 async function loadFromGit(cwd: string): Promise<string[] | null> {
     try {
-        const { stdout } = await execFileAsync('git', ['ls-files'], { cwd, maxBuffer: 50 * 1024 * 1024 });
+        // 添加 timeout 防止 git 进程挂起（如等待输入密码）
+        const { stdout } = await execFileAsync('git', ['ls-files'], { cwd, maxBuffer: 50 * 1024 * 1024, timeout: 10_000 });
         return stdout
             .split('\n')
             .map((s) => s.trim())

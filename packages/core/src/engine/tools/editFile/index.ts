@@ -25,6 +25,10 @@ export const editFileTool = tool({
             throw new Error(t('tool.editFile.sameStrings'));
         }
 
+        if (old_string === '') {
+            throw new Error(t('tool.editFile.emptyOldString'));
+        }
+
         const resolved = resolveSafePath(filePath);
         const content = await fs.readFile(resolved, 'utf-8');
 

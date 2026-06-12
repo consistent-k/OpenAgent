@@ -24,17 +24,25 @@ function escapeRegexChar(char: string): string {
     return /[\\^$+?.()|{}[\]]/.test(char) ? `\\${char}` : char;
 }
 
-function expandBraces(pattern: string): string[] {
+function expandBraces(pattern: string, depth = 0): string[] {
+    // 限制递归深度，防止恶意模式导致性能问题
+    const MAX_BRACE_DEPTH = 10;
+    const MAX_EXPANSIONS = 1000;
+
+    if (depth > MAX_BRACE_DEPTH) {
+        return [pattern];
+    }
+
     const start = pattern.indexOf('{');
     if (start === -1) return [pattern];
 
-    let depth = 0;
+    let braceDepth = 0;
     let end = -1;
     for (let i = start; i < pattern.length; i++) {
-        if (pattern[i] === '{') depth++;
+        if (pattern[i] === '{') braceDepth++;
         if (pattern[i] === '}') {
-            depth--;
-            if (depth === 0) {
+            braceDepth--;
+            if (braceDepth === 0) {
                 end = i;
                 break;
             }
@@ -60,8 +68,12 @@ function expandBraces(pattern: string): string[] {
 
     const results: string[] = [];
     for (const opt of options) {
-        for (const expanded of expandBraces(prefix + opt + suffix)) {
+        for (const expanded of expandBraces(prefix + opt + suffix, depth + 1)) {
             results.push(expanded);
+            // 限制展开结果数量
+            if (results.length >= MAX_EXPANSIONS) {
+                return results;
+            }
         }
     }
     return results;
@@ -87,10 +99,13 @@ function globToRegex(glob: string): RegExp {
         } else if (char === '?') {
             regexStr += '[^/]';
         } else if (char === '[') {
-            // 支持字符类 [abc]
+            // 支持字符类 [abc]，但需要转义内部的正则特殊字符
             const closeIdx = normalized.indexOf(']', i + 1);
             if (closeIdx !== -1) {
-                regexStr += normalized.slice(i, closeIdx + 1);
+                const charClass = normalized.slice(i + 1, closeIdx);
+                // 转义字符类内部的特殊正则字符（除了 ^ 和 -）
+                const escaped = charClass.replace(/[\\^$+?.()|{}]/g, '\\$&');
+                regexStr += `[${escaped}]`;
                 i = closeIdx;
             } else {
                 regexStr += escapeRegexChar(char);

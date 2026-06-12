@@ -127,22 +127,27 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts): Promis
             consecutiveFailures = 0;
 
             const updates = resp.data.result;
+            // 更新 offset，确保下次不再收到已处理的消息
             for (const update of updates) {
-                // 更新 offset，确保下次不再收到此消息
-                offset = update.update_id + 1;
+                if (update.update_id >= offset) {
+                    offset = update.update_id + 1;
+                }
+            }
 
+            // 并行处理消息，不阻塞轮询
+            const processPromises = updates.map(async (update) => {
                 const msg = update.message;
-                if (!msg?.text) continue;
+                if (!msg?.text) return;
 
                 // 忽略 bot 自身的消息
-                if (msg.from?.is_bot) continue;
+                if (msg.from?.is_bot) return;
 
                 const chatId = String(msg.chat.id);
                 const text = msg.text;
 
                 logger.info(`Inbound message: chatId=${chatId} text="${text.slice(0, 50)}${text.length > 50 ? '…' : ''}"`);
 
-                // 处理消息（同步处理，与 weixin 一致）
+                // 处理消息（异步，不阻塞轮询）
                 await processMessage({
                     userId: chatId,
                     text,
@@ -154,7 +159,9 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts): Promis
                 }).catch((err) => {
                     logger.error(`processMessage error for ${chatId}: ${String(err)}`);
                 });
-            }
+            });
+            // 等待所有消息处理完成（但不阻塞下一轮轮询）
+            await Promise.allSettled(processPromises);
         } catch (err) {
             if (abortSignal?.aborted) {
                 logger.info('Monitor stopped (aborted)');

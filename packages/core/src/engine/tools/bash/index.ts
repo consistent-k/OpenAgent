@@ -12,7 +12,9 @@ const MAX_OUTPUT_BYTES = 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 const DANGEROUS_PATTERNS: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
+    // 匹配 rm -rf / 或 rm / -rf 等变体（flags 可以在路径前或路径后）
     { pattern: /\brm\s+(-[a-zA-Z]*[rRfF][a-zA-Z]*\s+)+(\/|\/\*|~|\$HOME)(\s|$)/, reason: 'recursive delete of root or HOME' },
+    { pattern: /\brm\s+(\/|\/\*|~|\$HOME)(\s+)(-[a-zA-Z]*[rRfF][a-zA-Z]*)/, reason: 'recursive delete of root or HOME' },
     { pattern: /\bmkfs(\.[a-z0-9]+)?\b/, reason: 'formatting filesystem' },
     { pattern: /\bdd\s+[^|;&]*\bof=\/dev\//, reason: 'writing to raw device' },
     { pattern: /(^|\s)sudo\s/, reason: 'privileged execution' },
@@ -87,13 +89,20 @@ function isSingleReadonlyCommand(cmd: string): boolean {
 function isReadonlyCommand(command: string): boolean {
     const trimmed = command.trim();
 
+    // 换行符也是 bash 命令分隔符，必须检查
+    if (/\n/.test(trimmed)) {
+        return false;
+    }
+
     // 用 && 连接的命令，检查每一段是否都是只读
     const andParts = trimmed.split(/\s*&&\s*/);
     if (andParts.length > 1) {
         return andParts.every((part) => isSingleReadonlyCommand(part));
     }
 
-    const hasShellOperators = /[<>|&]|\|\||;/.test(trimmed);
+    // 管道 | 是只读操作（如 cat file | grep pattern），不应阻止
+    // 但 || (or)、>、<、&、; 是写操作或命令分隔符
+    const hasShellOperators = /[<>]|\|\||[&;]/.test(trimmed);
     if (hasShellOperators) {
         return false;
     }

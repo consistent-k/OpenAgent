@@ -12,19 +12,24 @@ export function Tips({ tip }: TipsProps) {
     const [remainMs, setRemainMs] = useState(0);
 
     // 当 retry 信息变化时，初始化倒计时
+    // 使用原始值作为依赖，避免对象引用变化导致 effect 反复重置
+    const tipType = tip?.type;
+    const retryDelayMs = tip?.type === 'retry' ? tip.info.retryDelayMs : undefined;
+    const attempt = tip?.type === 'retry' ? tip.info.attempt : undefined;
+
     useEffect(() => {
-        if (!tip || tip.type !== 'retry') {
+        if (tipType !== 'retry' || retryDelayMs === undefined) {
             setRemainMs(0);
             return;
         }
-        setRemainMs(tip.info.retryDelayMs);
+        setRemainMs(retryDelayMs);
 
         const interval = setInterval(() => {
             setRemainMs((prev) => (prev <= 1000 ? 0 : prev - 1000));
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [tip]);
+    }, [tipType, retryDelayMs, attempt]);
 
     if (!tip) return null;
 

@@ -78,7 +78,7 @@ export function SessionPicker({ sessions, onSelect, onCancel, onDelete }: Props)
                     }
                 }
             },
-            [sorted, onSelect, onDelete]
+            [sorted, onDelete]
         )
     );
 

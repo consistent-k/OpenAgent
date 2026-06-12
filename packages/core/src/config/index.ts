@@ -175,7 +175,12 @@ function readEnvConfig(): OpenAgentConfig {
                 }
             ],
             activeModel: `env/${model}`,
-            maxSteps: process.env.OPENAGENT_MAX_STEPS ? Number(process.env.OPENAGENT_MAX_STEPS) : undefined
+            maxSteps: process.env.OPENAGENT_MAX_STEPS
+                ? (() => {
+                      const n = Number(process.env.OPENAGENT_MAX_STEPS);
+                      return Number.isFinite(n) ? n : undefined;
+                  })()
+                : undefined
         };
     }
 

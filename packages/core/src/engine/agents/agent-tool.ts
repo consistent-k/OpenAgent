@@ -273,7 +273,10 @@ export async function executeAgentRun(agentDef: AgentDefinition, taskMessage: st
         if (msg.type === 'complete') finalResult = msg.result;
         if (msg.type === 'error') throw new Error(msg.error);
     }
-    return finalResult!;
+    if (!finalResult) {
+        throw new Error('Agent run completed without producing a result');
+    }
+    return finalResult;
 }
 
 /** Stringify AgentRunResult for use as AI tool output */
@@ -386,9 +389,10 @@ export function createUnifiedAgentTool() {
                 });
 
                 // Fire and forget — the task runs in the background
+                // 注意：后台任务不继承父级 abortSignal，否则父会话取消会杀死后台任务
                 void (async () => {
                     try {
-                        const result = await executeAgentRun(agentDef!, prompt, abortSignal, toolCallId);
+                        const result = await executeAgentRun(agentDef!, prompt, undefined, toolCallId);
                         updateBackgroundTask(taskId, {
                             status: 'completed',
                             result: result.result,

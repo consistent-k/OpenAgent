@@ -73,7 +73,15 @@ async function readHistory(project?: string): Promise<HistoryEntry[]> {
     try {
         const content = await fs.readFile(historyPath(), 'utf-8');
         const lines = content.trim().split('\n').filter(Boolean);
-        const entries = lines.map((line) => JSON.parse(line) as HistoryEntry);
+        // 逐行解析，跳过损坏的行（如进程崩溃导致的截断）
+        const entries: HistoryEntry[] = [];
+        for (const line of lines) {
+            try {
+                entries.push(JSON.parse(line) as HistoryEntry);
+            } catch {
+                // 跳过损坏的行，继续处理
+            }
+        }
         if (project) {
             const resolved = path.resolve(project);
             return entries.filter((e) => e.project === resolved);
@@ -124,9 +132,15 @@ export async function deleteSession(sessionId: string): Promise<void> {
     try {
         const content = await fs.readFile(historyPath(), 'utf-8');
         const lines = content.trim().split('\n').filter(Boolean);
+        // 逐行解析，跳过损坏的行
         const filtered = lines.filter((line) => {
-            const entry = JSON.parse(line) as HistoryEntry;
-            return entry.sessionId !== sessionId;
+            try {
+                const entry = JSON.parse(line) as HistoryEntry;
+                return entry.sessionId !== sessionId;
+            } catch {
+                // 保留无法解析的行（可能是损坏的）
+                return true;
+            }
         });
         await fs.writeFile(historyPath(), filtered.join('\n') + (filtered.length ? '\n' : ''), 'utf-8');
     } catch {

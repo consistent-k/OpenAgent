@@ -195,10 +195,12 @@ function patchStuckToolCalls(stream: ReadableStream<UIMessageChunk>): ReadableSt
                         } as UIMessageChunk);
                     }
                 } finally {
+                    // 确保在任何情况下都恢复 console.error
                     restoreErrors();
                 }
             },
             cancel() {
+                // 取消时也要恢复 console.error
                 restoreErrors();
             }
         })

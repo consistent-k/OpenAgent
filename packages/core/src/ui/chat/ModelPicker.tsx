@@ -1,7 +1,7 @@
 import { t } from '@oagent/i18n';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Dialog } from '../text/Dialog';
 import { ListItem } from '../text/ListItem';
 
@@ -19,7 +19,8 @@ export function ModelPicker({ providerName, models, onAdd, onDelete, onCancel }:
     const [addValue, setAddValue] = useState('');
     const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-    const allItems = [{ type: 'add' as const }, ...models.map((m) => ({ type: 'model' as const, name: m }))];
+    // 使用 useMemo 缓存 allItems，避免每次渲染创建新数组导致 useCallback 失效
+    const allItems = useMemo(() => [{ type: 'add' as const }, ...models.map((m) => ({ type: 'model' as const, name: m }))], [models]);
 
     useInput(
         useCallback(

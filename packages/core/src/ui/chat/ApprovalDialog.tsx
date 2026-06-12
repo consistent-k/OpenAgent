@@ -48,11 +48,15 @@ export function ApprovalDialog({ pending, onApprove, onAlwaysApprove, onDeny, on
     // All selectable items: options + custom input entry
     const allItems = isQuestion ? [...questionOptions, t('ui.approval.customInput')] : [];
 
+    // 使用稳定标识符作为依赖，避免对象引用变化导致 effect 反复重置
+    const pendingToolCallId = pending.toolCallId;
+    const pendingToolName = pending.toolName;
+
     useEffect(() => {
         setIndex(0);
         setCustomInputMode(false);
         setCustomText('');
-    }, [pending]);
+    }, [pendingToolCallId, pendingToolName]);
 
     const approvalOptions = getApprovalOptions();
     const maxIndex = isQuestion ? allItems.length - 1 : approvalOptions.length - 1;

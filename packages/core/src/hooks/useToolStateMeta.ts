@@ -42,6 +42,9 @@ export function getToolStateMeta(state: string, variant: 'agent' | 'tool' = 'too
         case 'approval-responded':
             label = variant === 'agent' ? t('tool.agent.running') : t('tool.state.executing');
             break;
+        case 'output-available':
+            label = variant === 'agent' ? t('tool.agent.completed') : t('tool.state.completed');
+            break;
         case 'output-error':
             label = t('tool.state.error');
             break;

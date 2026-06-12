@@ -26,7 +26,12 @@ function parseDuckDuckGoHtml(html: string, maxResults: number): SearchResult[] {
         const uddgMatch = url.match(/[?&]uddg=([^&]+)/);
         if (uddgMatch) {
             try {
-                url = decodeURIComponent(uddgMatch[1]);
+                const decoded = decodeURIComponent(uddgMatch[1]);
+                // 验证解码后的 URL 是 http/https 协议
+                const parsed = new URL(decoded);
+                if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                    url = decoded;
+                }
             } catch {
                 // malformed URL, keep original
             }

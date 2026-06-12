@@ -109,7 +109,8 @@ export const grepTool = tool({
             const matches = searchFileLines(filePath, regex, context, lines);
             if (matches.length === 0) return null;
 
-            const matchCount = context > 0 ? lines.filter((l) => regex.test(l)).length : matches.length;
+            // matchCount 始终是实际匹配的行数（不含上下文行）
+            const matchCount = lines.filter((l) => regex.test(l)).length;
             return { file: relPath, matches, matchCount };
         }
 
@@ -167,7 +168,8 @@ export const grepTool = tool({
                 return { path: searchPath, pattern, files, totalFiles: files.length };
             }
             if (output_mode === 'count') {
-                const counts = results.map((r) => ({ file: r.file, count: r.matches.length }));
+                // 使用 matchCount（实际匹配行数）而非 matches.length（含上下文行）
+                const counts = results.map((r) => ({ file: r.file, count: r.matchCount }));
                 const totalCount = counts.reduce((s, c) => s + c.count, 0);
                 return { path: searchPath, pattern, counts, totalCount };
             }

@@ -95,9 +95,10 @@ export async function runUpdate(): Promise<UpdateResult> {
     }
 
     try {
+        // 使用 install@latest 确保大版本升级也能生效（npm update -g 只更新 semver 范围内的版本）
         const updateCmds: Record<PackageManager, string> = {
-            npm: `npm update -g ${PKG_NAME}`,
-            pnpm: `pnpm update -g ${PKG_NAME}`,
+            npm: `npm install -g ${PKG_NAME}@latest`,
+            pnpm: `pnpm install -g ${PKG_NAME}@latest`,
             yarn: `yarn global upgrade ${PKG_NAME}`
         };
         const { stdout } = await execAsync(updateCmds[pm], {

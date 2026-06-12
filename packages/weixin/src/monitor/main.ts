@@ -146,14 +146,14 @@ export async function monitorWeixinProvider(opts: MonitorWeixinOpts): Promise<vo
                 getUpdatesBuf = resp.get_updates_buf;
             }
 
-            // 处理消息
+            // 处理消息（并行处理，不阻塞轮询）
             const list = resp.msgs ?? [];
-            for (const msg of list) {
+            const processPromises = list.map(async (msg) => {
                 const fromUser = msg.from_user_id ?? 'unknown';
                 logger.info(`Inbound message: from=${fromUser} types=${msg.item_list?.map((i) => i.type).join(',') ?? 'none'}`);
 
                 const adapted = adaptWeixinMessage(msg);
-                if (!adapted) continue;
+                if (!adapted) return;
 
                 const contextToken = getContextToken(accountId, adapted.userId);
 
@@ -176,7 +176,9 @@ export async function monitorWeixinProvider(opts: MonitorWeixinOpts): Promise<vo
                 }).catch((err) => {
                     logger.error(`processMessage error for ${adapted.userId}: ${String(err)}`);
                 });
-            }
+            });
+            // 等待所有消息处理完成（但不阻塞下一轮轮询）
+            await Promise.allSettled(processPromises);
         } catch (err) {
             if (abortSignal?.aborted) {
                 logger.info('Monitor stopped (aborted)');

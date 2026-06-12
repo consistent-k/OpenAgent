@@ -65,20 +65,49 @@ export const fetchTool = tool({
     execute: async ({ url, method = 'GET', headers, body, prompt }) => {
         try {
             await assertPublicHttpUrl(url);
-            const response = await axios({
-                url,
-                method,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (compatible; AgentFetch/1.0)',
-                    ...headers
-                },
-                data: method === 'POST' ? body : undefined,
+
+            // 创建自定义 axios 实例，拦截重定向以检查目标 URL
+            const axiosInstance = axios.create({
                 timeout: 30000,
-                maxRedirects: 5,
+                maxRedirects: 0, // 禁用自动重定向，手动处理
                 maxContentLength: 10 * 1024 * 1024,
                 maxBodyLength: 10 * 1024 * 1024,
-                validateStatus: (status) => status >= 200 && status < 400
+                validateStatus: (status) => (status >= 200 && status < 400) || (status >= 300 && status < 400)
             });
+
+            let currentUrl = url;
+            let response;
+            let redirectCount = 0;
+            const MAX_REDIRECTS = 5;
+
+            // 手动处理重定向，每次重定向都检查目标 URL
+            do {
+                response = await axiosInstance({
+                    url: currentUrl,
+                    method: redirectCount === 0 ? method : 'GET',
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (compatible; AgentFetch/1.0)',
+                        ...headers
+                    },
+                    data: redirectCount === 0 && method === 'POST' ? body : undefined
+                });
+
+                // 检查是否需要重定向
+                if (response.status >= 300 && response.status < 400) {
+                    const location = response.headers.location;
+                    if (!location) break;
+
+                    // 解析重定向 URL
+                    const redirectUrl = new URL(location, currentUrl).href;
+                    await assertPublicHttpUrl(redirectUrl);
+                    currentUrl = redirectUrl;
+                    redirectCount++;
+
+                    if (redirectCount > MAX_REDIRECTS) {
+                        throw new Error(t('tool.fetch.tooManyRedirects'));
+                    }
+                }
+            } while (response.status >= 300 && response.status < 400);
 
             const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data, null, 2);
 

@@ -25,7 +25,8 @@ export const agentsCommand: SlashCommand = {
 
         const list = agents
             .map((a) => {
-                const tools = a.allowedTools ? a.allowedTools.join(', ') : 'all';
+                // 空数组应显示 'none'，非空数组显示工具列表，undefined/null 显示 'all'
+                const tools = a.allowedTools ? (a.allowedTools.length > 0 ? a.allowedTools.join(', ') : 'none') : 'all';
                 const source = `[${a.source}]`;
                 const model = a.model ? ` | Model: ${a.model}` : '';
                 return `- **${a.name}** (/${a.id}) ${source}\n  ${a.description}\n  Tools: ${tools}${model}`;
